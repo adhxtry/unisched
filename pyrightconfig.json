@@ -1,0 +1,10 @@
+{
+    "venvPath": ".",
+    "venv": ".venv",
+    "extraPaths": ["src"],
+    "include": ["src", "tests"],
+    "exclude": ["**/__pycache__", ".venv"],
+
+    // Preferences for linting
+    "reportUnusedCallResult": false,
+}
