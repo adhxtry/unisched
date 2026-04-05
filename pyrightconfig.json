@@ -5,6 +5,5 @@
     "include": ["src", "tests"],
     "exclude": ["**/__pycache__", ".venv"],
 
-    // Preferences for linting
-    "reportUnusedCallResult": false,
+    "reportUnusedCallResult": false
 }
