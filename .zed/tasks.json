@@ -5,7 +5,15 @@
     {
         "label": "unisched::tests",
         "command": "uv",
-        "args": ["run", "python", "-m", "unittest", "discover", "-s", "tests"],
+        "args": [
+            "run",
+            "python",
+            "-m",
+            "unittest",
+            "discover",
+            "-s",
+            "tests"
+        ],
         "use_new_terminal": false,
         "allow_concurrent_runs": false,
         "reveal": "always",
@@ -16,6 +24,9 @@
         "show_command": true,
         "save": "none",
         // Represents the tags for inline runnable indicators, or spawning multiple tasks at once.
-        "tags": ["test", "python"],
+        "tags": [
+            "test",
+            "python"
+        ],
     },
 ]

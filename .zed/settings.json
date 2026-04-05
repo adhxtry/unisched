@@ -3,7 +3,6 @@
     // Editor Appearance
     // =========================
     "tab_size": 4,
-
     // =========================
     // Language-Specific Settings
     // =========================
@@ -11,9 +10,9 @@
         "Python": {
             "formatter": {
                 "external": {
-                    "command": "black",
-                },
-            },
-        },
-    },
+                    "command": "black"
+                }
+            }
+        }
+    }
 }
