@@ -9,12 +9,7 @@
             "command": "uv",
             "args": [
                 "run",
-                "python",
-                "-m",
-                "unittest",
-                "discover",
-                "-s",
-                "tests"
+                "pytest"
             ],
             "hide": false
         }

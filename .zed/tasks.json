@@ -7,12 +7,7 @@
         "command": "uv",
         "args": [
             "run",
-            "python",
-            "-m",
-            "unittest",
-            "discover",
-            "-s",
-            "tests"
+            "pytest"
         ],
         "use_new_terminal": false,
         "allow_concurrent_runs": false,
@@ -27,6 +22,6 @@
         "tags": [
             "test",
             "python"
-        ],
-    },
+        ]
+    }
 ]

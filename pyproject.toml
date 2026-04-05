@@ -16,6 +16,19 @@ unisched = "unisched.__main__:main"
 
 [project.optional-dependencies]
 deploy = ["nuitka", "zstandard"]  # deployment-only deps
+dev = ["black", "pytest", "pytest-qt"]  # development-only deps
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/unisched"]
+
+[tool.black]
+line-length = 100
+target-version = ['py312']
+skip-string-normalization = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-ra"
+markers = []
