@@ -9,7 +9,11 @@ version = "0.1.0"
 description = "An exam scheduler application built with Python, designed to efficiently manage and optimize exam schedules at university level."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
-dependencies = ["pyside6==6.6"]
+dependencies = [
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.2",
+    "pyside6==6.6",
+]
 
 [project.scripts]
 unisched = "unisched.__main__:main"

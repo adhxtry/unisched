@@ -1,5 +1,3 @@
-.venv
-
 # Byte-compiled source for python
 __pycache__/
 *.py[cod]
