@@ -91,42 +91,66 @@ classDiagram
     BaseOptimizer <|-- ILPOptimizer
 ```
 
+### API Usage Flow
+The library API should feel simple to use. First, the user gives the data to `io`, then `core` prepares the schedule using the chosen optimizer, and finally the result comes back as a schedule or a clash report. The API should hide the internal steps so the user only sees a clear start point and a clear output.
 
-### Interactive GUI and Core Support
-To support on-the-fly updates, the core library will provide specific service methods:
-- `move_course_and_resolve(course_id, new_date)`: Moves a course and attempts to rearrange others to resolve student clashes.
-- `reassign_hall_and_resolve(course_id, new_hall_id)`: Changes a hall and rearranges to resolve hall capacity/overlap clashes.
+Example flow:
+- load exam and student data
+- normalize the input into a common format
+- choose an optimizer
+- generate the schedule
+- check the result and return it
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant GUI as GUI (View/Controller)
-    participant API as Core Library API
-    participant Engine as Optimization Engine
+    participant API as Library API
+    participant IO as io layer
+    participant CORE as core layer
+    participant DOMAIN as domain layer
 
-    User->>GUI: Select Registration file, define schema
-    GUI->>API: load_data(file_path, schema)
-    User->>GUI: Setup constraints and preferences
-    GUI->>API: set_constraints(constraints)
-    API->>Engine: apply_constraints(constraints)
-    Engine-->>API: Ready for Scheduling
-    User->>GUI: Select Optimizer, Trigger Schedule Generation
-    GUI->>API: generate_schedule(optimizer_type)
-    API->>Engine: run_optimizer(optimizer_type)
-    Engine-->>API: Generated Schedule + Conflict Report
-    API-->>GUI: Render Schedule + Conflict Details
+    User->>API: Give input files and settings
+    API->>IO: Read and normalize data
+    IO-->>API: Clean data
+    API->>CORE: Start scheduling step
+    CORE->>DOMAIN: Check rules and constraints
+    DOMAIN-->>CORE: Valid rules / conflict details
+    CORE-->>API: Schedule result
+    API-->>User: Return schedule or clash report
+```
 
-    User->>GUI: Move Course to New Date
-    GUI->>API: update_schedule(course_id, new_date)
-    API->>Engine: resolve_student_clashes(course_id)
-    Engine-->>API: Updated Schedule / Conflicts
+
+### Interactive GUI
+The GUI should also be able to make small updates after a schedule is already built. For example, the user may move one exam to a new date or switch it to another hall. The core part of the library should then recheck the schedule, fix any clash if possible, and return the updated result.
+
+Possible actions:
+- move one course to a new date
+- change the hall for one exam
+- recheck clashes after each change
+- return either an updated schedule or a problem report
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant GUI as GUI
+    participant API as Library API
+    participant CORE as core layer
+    participant DOMAIN as domain layer
+
+    User->>GUI: Open the current schedule
+    GUI->>API: Ask for a change
+    API->>CORE: Send the change request
+    CORE->>DOMAIN: Check rules and clashes
+    DOMAIN-->>CORE: Valid result or conflict details
+    CORE-->>API: Updated schedule or report
+    API-->>GUI: Show the result
 
     alt not_resolvable
-        API-->>GUI: Reject + Diagnostic Details
-        GUI-->>User: Prompt for resolution/Undo
+        API-->>GUI: Show the issue
+        GUI-->>User: Ask for another choice
     else success
-        API-->>GUI: Updated Schedule
-        GUI-->>User: Render Updated Schedule
+        API-->>GUI: Show the updated schedule
+        GUI-->>User: Refresh the view
     end
 ```
 
