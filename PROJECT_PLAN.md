@@ -17,7 +17,7 @@ I want to use a simple layered architecture. The idea is to separate data models
 
 ### Core Modules
 1. **`unisched.domain`**: Contains the main exam scheduling concepts and rules. This includes models like `Course`, `Student`, `ExamHall`, `TimeSlot`, `Schedule`, and `Constraint`.
-2. **`unisched.core`**: Handles app-level flow. It runs scheduling steps, connects optimizers, validates data, and exposes a clean API.
+2. **`unisched.core`**: Handles app-level flow. It runs scheduling steps, connects optimizers, checks scheduling constraints, and exposes a clean API.
 3. **`unisched.io`**: Handles input/output. Reads files (CSV, Excel, etc.), normalizes schema, and converts data to/from pandas `DataFrame`.
 4. **`unisched.gui`**: The UI layer (MVVM). It only handles interaction and display, and calls `core` for scheduling logic.
 
@@ -26,7 +26,9 @@ The dependency direction is:
 - `domain` depends on nothing else.
 - `core` depends on `domain`.
 - `io` and `gui` depend on `core`.
-- Models and validation rules stay in `domain`, app flow stays in `core`, and file/UI concerns stay in `io`/`gui`.
+- `io` may map file data into domain models before handing it to `core`.
+- Models and scheduling rules stay in `domain`, app flow stays in `core`, and file/UI concerns stay in `io`/`gui`.
+- `io` handles file/schema validation, while `core` and `domain` handle scheduling checks.
 
 ```mermaid
 classDiagram
@@ -171,7 +173,7 @@ sequenceDiagram
 - Refine the optimal hall allotting algorithm for better utilization and less fragmentation.
 
 ### Core Services for Interactivity
-- Implement `core` use-cases for manual changes.
+- Implement `core` scheduling steps for manual changes.
 - Implement clash detection and automatic localized conflict resolution (`move_course_and_resolve`).
 
 ### Stable API & Documentation
