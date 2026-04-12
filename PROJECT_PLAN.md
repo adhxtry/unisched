@@ -59,6 +59,7 @@ classDiagram
 
     core --> domain : uses
     io --> core : invokes
+    gui --> io : invokes
     gui --> core : invokes
     io --> domain : maps
 ```
@@ -161,6 +162,7 @@ sequenceDiagram
 ### Foundation & Data Pipeline
 - Define main entities and rules in `domain`.
 - Implement the `io` module to read various formats and normalize into `pandas.DataFrame`.
+- Support csv, Excel and ODS input formats.
 - Implement schema validation and structural boundaries.
 
 ### Optimizer Framework & Graph Coloring
