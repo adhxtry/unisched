@@ -159,6 +159,9 @@ sequenceDiagram
 
 ## Goals
 
+### Logging
+- Implement a logging system to track the scheduling process and any issues that arise.
+
 ### Foundation & Data Pipeline
 - Define main entities and rules in `domain`.
 - Implement the `io` module to read various formats and normalize into `pandas.DataFrame`.

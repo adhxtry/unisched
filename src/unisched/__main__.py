@@ -1,3 +1,6 @@
+from unisched import print_hello
+
+
 def main():
-    print("hello")
+    print_hello()
     return True
