@@ -10,6 +10,7 @@ description = "An exam scheduler application built with Python, designed to effi
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
+    "odfpy>=1.4.1",
     "openpyxl>=3.1.5",
     "pandas>=3.0.2",
     "pyside6>=6.7,<6.8",
