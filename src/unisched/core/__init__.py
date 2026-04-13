@@ -31,3 +31,12 @@ Planned main classes:
 - `ILPOptimizer`
 - `SchedulingCoordinator`
 """
+
+from .coordinator import SchedulingCoordinator
+from .optimizers import BaseOptimizer, GraphColoringOptimizer
+
+__all__ = [
+    "BaseOptimizer",
+    "GraphColoringOptimizer",
+    "SchedulingCoordinator",
+]

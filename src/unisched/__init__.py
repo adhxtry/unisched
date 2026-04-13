@@ -20,7 +20,17 @@ Notes:
 - This module should remain the single, stable import point for advanced users.
 """
 
+from .api import schedule
+from .core import BaseOptimizer, GraphColoringOptimizer, SchedulingCoordinator
+from .domain import Course, ExamEvent, Schedule, TimeSlot
 
-def print_hello():
-    print("hello")
-    return True
+__all__ = [
+    "BaseOptimizer",
+    "Course",
+    "ExamEvent",
+    "GraphColoringOptimizer",
+    "Schedule",
+    "SchedulingCoordinator",
+    "TimeSlot",
+    "schedule",
+]
