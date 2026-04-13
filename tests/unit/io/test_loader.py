@@ -137,3 +137,24 @@ def test_load_registration_data_rejects_missing_configured_columns(
             input_file,
             RegDataConfig(student_id_col="sid", course_col="subject"),
         )
+
+
+def test_load_registration_data_applies_normalizer(tmp_path: Path) -> None:
+    """Configured normalizer should run before required-column validation."""
+
+    input_path = tmp_path / "registration.csv"
+    pd.DataFrame({"sid": [1], "unit": ["math"]}).to_csv(input_path, index=False)
+
+    def normalize_columns(data_frame: pd.DataFrame) -> pd.DataFrame:
+        return data_frame.rename(columns={"sid": "student_id", "unit": "course"})
+
+    input_file = ValidatedFile.from_path(input_path)
+    loader = RegDataLoader()
+
+    result = loader.load_registration_data(
+        input_file,
+        RegDataConfig(normalizer=normalize_columns),
+    )
+
+    expected = pd.DataFrame({"student_id": [1], "course": ["math"]})
+    pd.testing.assert_frame_equal(result, expected)

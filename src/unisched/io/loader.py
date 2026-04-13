@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 import pandas as pd
 
@@ -26,6 +27,9 @@ class RegDataConfig:
     student_id_col: str = "student_id"  # Column name for student IDs
     course_col: str = "course"  # Column name for course names
     sheet_name: str | int | None = None  # Optional sheet name/index for Excel/ODS files
+    normalizer: Callable[[pd.DataFrame], pd.DataFrame] | None = (
+        None  # Optional function to normalize the loaded DataFrame (e.g., trim whitespace, standardize case)
+    )
 
 
 class RegDataLoader:
@@ -93,20 +97,19 @@ class RegDataLoader:
 
         extension = input_file.extension
 
+        loaded_data: pd.DataFrame
         if extension == ".csv":
-            return self._validate_loaded_data(
-                self._load_csv(input_file.path),
-                active_config,
-            )
-        if extension in {".xlsx", ".xls"}:
-            return self._validate_loaded_data(
-                self._load_excel(input_file.path, active_config.sheet_name),
-                active_config,
-            )
-        if extension == ".ods":
-            return self._validate_loaded_data(
-                self._load_ods(input_file.path, active_config.sheet_name),
-                active_config,
+            loaded_data = self._load_csv(input_file.path)
+        elif extension in {".xlsx", ".xls"}:
+            loaded_data = self._load_excel(input_file.path, active_config.sheet_name)
+        elif extension == ".ods":
+            loaded_data = self._load_ods(input_file.path, active_config.sheet_name)
+        else:
+            raise ValueError(
+                f"Unsupported registration file format: {extension or '<no extension>'}"
             )
 
-        raise ValueError(f"Unsupported registration file format: {extension or '<no extension>'}")
+        if active_config.normalizer is not None:
+            loaded_data = active_config.normalizer(loaded_data)
+
+        return self._validate_loaded_data(loaded_data, active_config)

@@ -10,6 +10,8 @@ Planned files and responsibilities:
     - CSV parsing with delimiter/encoding handling.
     - Excel parsing (`.xls`, `.xlsx`) with sheet selection support.
     - ODS parsing for open document spreadsheets.
+- `files.py`
+    - File validation (existence checks).
 - `schema_mapper.py`
     - Map heterogeneous source columns into canonical schema names.
 - `validator.py`
