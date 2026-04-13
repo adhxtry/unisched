@@ -1,24 +1,12 @@
 from __future__ import annotations
 
-import sys
-
-from unisched import schedule
-from unisched.io.loader import RegDataConfig
+from unisched.gui import run_gui_app
 
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: unisched <registration-file>")
-        return 0
+def main() -> int:
+    """Launch the desktop GUI application."""
 
-    result = schedule(
-        sys.argv[1],
-        config=RegDataConfig(student_id_col="Name", course_col="Course Number"),
-    )
-    print(f"Scheduled exams: {len(result.events)}")
-    print(f"Unscheduled courses: {len(result.unscheduled_courses)}")
-    print(f"Penalty: {result.penalty}")
-    return 0
+    return run_gui_app()
 
 
 if __name__ == "__main__":
