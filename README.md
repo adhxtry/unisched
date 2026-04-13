@@ -28,12 +28,6 @@ The project is intentionally minimal and designed to be extended over time.
 - `unisched.core`: coordinator and optimizer interfaces/implementations
 - `unisched.gui`: desktop user interface
 
-## GUI Screenshot
-
-Add your screenshot here later:
-
-![GUI Screenshot Placeholder](docs/gui-screenshot-placeholder.png)
-
 ## Requirements
 
 - Python 3.12
