@@ -32,3 +32,22 @@ Planned main classes:
 - `Constraint` (base abstraction)
 - Domain-specific conflict/result models
 """
+
+from .constraints import (
+    ConflictModel,
+    calculate_penalty,
+    calculate_schedule_penalty,
+    compute_student_conflicts,
+)
+from .models import Course, ExamEvent, Schedule, TimeSlot
+
+__all__ = [
+    "ConflictModel",
+    "Course",
+    "ExamEvent",
+    "Schedule",
+    "TimeSlot",
+    "calculate_penalty",
+    "calculate_schedule_penalty",
+    "compute_student_conflicts",
+]
