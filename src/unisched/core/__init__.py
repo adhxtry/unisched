@@ -17,8 +17,6 @@ Planned files and responsibilities:
     - Integer linear programming optimizer for exact/near-exact solutions.
 - `coordinator.py`
     - Scheduling pipeline coordinator: preprocess, optimize, post-validate.
-- `constraints_service.py`
-    - Cross-cutting rule checks using domain constraints.
 - `interactive.py`
     - Manual adjustment handlers such as move-and-resolve operations.
 - `hall_allocation.py`

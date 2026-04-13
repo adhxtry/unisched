@@ -13,3 +13,4 @@ class BaseOptimizer(ABC):
     @abstractmethod
     def optimize(self, courses: list[Course], time_slots: list[TimeSlot]) -> Schedule:
         """Create a schedule for the given courses and available time slots."""
+        pass

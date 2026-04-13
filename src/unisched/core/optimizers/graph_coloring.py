@@ -38,10 +38,16 @@ def _dsatur_order(
     color_map: dict[str, int],
     enrollments: dict[str, int],
 ) -> Iterator[str]:
+    """
+    Generator function for DSatur ordering of nodes.
+    DSatur chooses the nodes with the highest saturation degree, i.e.,
+    the most number of differently colored neighbors.
+    """
     uncolored = set(graph)
 
     while uncolored:
 
+        # Define a scoring function with tie-breaking for saturation degree, degree, and enrollment size
         def score(course_code: str) -> tuple[int, int, int, str]:
             neighbor_colors = {
                 color_map[neighbor] for neighbor in graph[course_code] if neighbor in color_map
@@ -66,10 +72,16 @@ def _color_once(
     *,
     randomize: bool,
 ) -> ColoringResult | None:
+    """
+    Perform a single graph coloring attempt.
+    """
+    # Start with an empty map
     color_map: dict[str, int] = {}
 
     for course_code in _dsatur_order(graph, color_map, enrollments):
+        # Determine which colors are blocked by neighbors
         blocked = {color_map[nbr] for nbr in graph[course_code] if nbr in color_map}
+        # Find the available color indices
         available = [idx for idx in range(slot_count) if idx not in blocked]
 
         if not available:
@@ -88,12 +100,14 @@ def _build_schedule(
     time_slots: list[TimeSlot],
     color_map: dict[str, int],
 ) -> Schedule:
+    # Build the exam events based on the coloring result
     events = [
         ExamEvent(course_code=course.code, time_slot=time_slots[color_map[course.code]])
         for course in sorted(courses, key=lambda current: current.code)
         if course.code in color_map
     ]
 
+    # Determine which courses were not scheduled
     scheduled = {event.course_code for event in events}
     unscheduled = sorted(course.code for course in courses if course.code not in scheduled)
 
@@ -123,12 +137,14 @@ def optimize_graph_coloring(
     if not courses:
         return Schedule()
 
+    # Build the conflict graph and enrollment map once since they are reused across attempts
     graph = build_conflict_graph(courses)
     enrollments = {course.code: len(course.students) for course in courses}
 
     best_schedule: Schedule | None = None
     best_used_slots = float("inf")
 
+    # Run multiple attempts with different random seeds to find a better coloring
     for attempt in range(num_tries):
         rng = random.Random(random_seed + attempt)
         coloring = _color_once(
@@ -136,11 +152,12 @@ def optimize_graph_coloring(
             len(time_slots),
             enrollments,
             rng,
-            randomize=attempt > 0,
+            randomize=attempt > 0,  # Only randomize after the first attempt
         )
         if coloring is None:
             continue
 
+        # Build the schedule from the coloring result and evaluate its penalty
         schedule = _build_schedule(courses, time_slots, coloring.color_map)
         used_slots = len({event.time_slot for event in schedule.events})
 
