@@ -17,7 +17,7 @@ def main() -> None:
 
     result = schedule(
         input_file,
-        config=RegDataConfig(student_id_col="Name", course_col="Course Number"),
+        config=RegDataConfig(student_id_col="Name", course_col="Course Title"),
         max_days=8,
     )
 
