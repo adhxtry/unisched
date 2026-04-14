@@ -2,7 +2,7 @@ from unisched.core.optimizers.graph_coloring import (
     build_conflict_graph,
     optimize_graph_coloring,
 )
-from unisched.domain.models import Course, TimeSlot
+from unisched.domain.models import Course, ExamHall, TimeSlot
 
 
 def _sample_courses() -> list[Course]:
@@ -39,3 +39,38 @@ def test_optimize_graph_coloring_marks_unscheduled_when_slots_insufficient() -> 
 
     assert schedule.events == []
     assert set(schedule.unscheduled_courses) == {"A", "B", "C"}
+
+
+def test_optimize_graph_coloring_assigns_halls_when_capacity_is_available() -> None:
+    courses = _sample_courses()
+    time_slots = [TimeSlot(day=1, slot_index=1), TimeSlot(day=1, slot_index=2)]
+    halls = [
+        ExamHall(hall="L-1", capacity=300, group=1),
+        ExamHall(hall="L-2", capacity=100, group=1),
+    ]
+
+    schedule = optimize_graph_coloring(
+        courses,
+        time_slots,
+        halls=halls,
+        num_tries=8,
+        random_seed=7,
+    )
+
+    assert schedule.is_complete is True
+    assert all(event.halls for event in schedule.events)
+
+
+def test_optimize_graph_coloring_respects_hard_group_constraint() -> None:
+    students = frozenset({f"s{i}" for i in range(30)})
+    courses = [Course(code="A", students=students)]
+    time_slots = [TimeSlot(day=1, slot_index=1)]
+    halls = [
+        ExamHall(hall="G1-H1", capacity=20, group=1),
+        ExamHall(hall="G2-H1", capacity=20, group=2),
+    ]
+
+    schedule = optimize_graph_coloring(courses, time_slots, halls=halls, num_tries=1)
+
+    assert schedule.events == []
+    assert schedule.unscheduled_courses == ["A"]

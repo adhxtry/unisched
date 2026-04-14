@@ -2,7 +2,7 @@ from unisched.domain.constraints import (
     calculate_penalty,
     compute_student_conflicts,
 )
-from unisched.domain.models import Course, ExamEvent, Schedule, TimeSlot
+from unisched.domain.models import Course, ExamEvent, ExamHall, Schedule, TimeSlot
 
 
 def test_timeslot_validation_and_ordering() -> None:
@@ -47,3 +47,21 @@ def test_schedule_assignment_map_and_completeness() -> None:
 
     assert mapping["A"] == TimeSlot(day=1, slot_index=1)
     assert schedule.is_complete is True
+
+
+def test_exam_hall_validation() -> None:
+    hall = ExamHall(hall="L-1", capacity=300, group=1)
+
+    assert hall.hall == "L-1"
+    assert hall.capacity == 300
+    assert hall.group == 1
+
+
+def test_exam_event_supports_hall_assignments() -> None:
+    event = ExamEvent(
+        course_code="A",
+        time_slot=TimeSlot(day=1, slot_index=1),
+        halls=("L-1", "L-3"),
+    )
+
+    assert event.halls == ("L-1", "L-3")

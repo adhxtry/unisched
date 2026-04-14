@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from unisched.core.coordinator import SchedulingCoordinator
-from unisched.io.loader import RegDataConfig
+from unisched.io.loader import HallDataConfig, RegDataConfig
 
 
 def test_coordinator_load_and_schedule_csv(tmp_path: Path) -> None:
@@ -64,3 +64,33 @@ def test_coordinator_rejects_invalid_max_days() -> None:
 
     with pytest.raises(ValueError, match="max_days"):
         coordinator._generate_time_slots(3)
+
+
+def test_coordinator_load_and_schedule_with_hall_capacity(tmp_path: Path) -> None:
+    registration_path = tmp_path / "registration.csv"
+    hall_path = tmp_path / "halls.csv"
+
+    pd.DataFrame(
+        {
+            "student_id": [1, 2, 3],
+            "course": ["A", "A", "B"],
+        }
+    ).to_csv(registration_path, index=False)
+
+    pd.DataFrame(
+        {
+            "Hall Name": ["L-1", "L-2"],
+            "Capacity": [2, 2],
+            "Group": [1, 1],
+        }
+    ).to_csv(hall_path, index=False)
+
+    coordinator = SchedulingCoordinator()
+    schedule = coordinator.load_and_schedule(
+        registration_path,
+        hall_capacity_file=hall_path,
+        hall_config=HallDataConfig(),
+    )
+
+    assert schedule.is_complete is True
+    assert all(event.halls for event in schedule.events)
