@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Callable, Iterator
 
@@ -164,6 +165,7 @@ def optimize_graph_coloring(
     halls: list[ExamHall] | None = None,
     num_tries: int = 32,
     random_seed: int = 0,
+    n: int = 1,
     iteration_callback: Callable[[int], None] | None = None,
 ) -> Schedule:
     """Run repeated DSatur coloring and keep the best schedule found."""
@@ -172,6 +174,8 @@ def optimize_graph_coloring(
         raise ValueError("time_slots must not be empty")
     if num_tries < 1:
         raise ValueError("num_tries must be >= 1")
+    if n < 1:
+        raise ValueError("n must be >= 1")
 
     if not courses:
         return Schedule()
@@ -184,9 +188,8 @@ def optimize_graph_coloring(
     best_schedule: Schedule | None = None
     best_used_slots = float("inf")
 
-    # Run multiple attempts with different random seeds to find a better coloring
-    for attempt in range(num_tries):
-        iteration = attempt + 1
+    # Run one coloring attempt with independent state so attempts can run safely in parallel.
+    def run_attempt(attempt: int) -> tuple[int, ColoringResult | None]:
         rng = random.Random(random_seed + attempt)
         hall_inventory_by_slot = (
             build_slot_hall_inventory(len(time_slots), grouped_halls_template)
@@ -201,27 +204,38 @@ def optimize_graph_coloring(
             hall_inventory_by_slot,
             randomize=attempt > 0,  # Only randomize after the first attempt
         )
-        if iteration_callback is not None:
-            iteration_callback(iteration)
+        return attempt, coloring
 
-        if coloring is None:
-            continue
+    # Keep callback synchronization on the main thread while attempts run in worker threads.
+    with ThreadPoolExecutor(max_workers=min(n, num_tries)) as executor:
+        future_to_attempt = {
+            executor.submit(run_attempt, attempt): attempt for attempt in range(num_tries)
+        }
 
-        # Build the schedule from the coloring result and evaluate its penalty
-        schedule = _build_schedule(
-            courses,
-            time_slots,
-            coloring.color_map,
-            coloring.hall_map,
-        )
-        used_slots = len({event.time_slot for event in schedule.events})
+        for future in as_completed(future_to_attempt):
+            attempt, coloring = future.result()
 
-        if best_schedule is None or (schedule.penalty, used_slots) < (
-            best_schedule.penalty,
-            best_used_slots,
-        ):
-            best_schedule = schedule
-            best_used_slots = used_slots
+            if iteration_callback is not None:
+                iteration_callback(attempt + 1)
+
+            if coloring is None:
+                continue
+
+            # Build the schedule from the coloring result and evaluate its penalty.
+            schedule = _build_schedule(
+                courses,
+                time_slots,
+                coloring.color_map,
+                coloring.hall_map,
+            )
+            used_slots = len({event.time_slot for event in schedule.events})
+
+            if best_schedule is None or (schedule.penalty, used_slots) < (
+                best_schedule.penalty,
+                best_used_slots,
+            ):
+                best_schedule = schedule
+                best_used_slots = used_slots
 
     if best_schedule is not None:
         return best_schedule
@@ -236,10 +250,12 @@ class GraphColoringOptimizer(BaseOptimizer):
         self,
         num_tries: int = 32,
         random_seed: int = 0,
+        n: int = 4,
         iteration_callback: Callable[[int], None] | None = None,
     ) -> None:
         self.num_tries = num_tries
         self.random_seed = random_seed
+        self.n = n
         self.iteration_callback = iteration_callback
 
     def optimize(
@@ -255,5 +271,6 @@ class GraphColoringOptimizer(BaseOptimizer):
             halls=halls,
             num_tries=self.num_tries,
             random_seed=self.random_seed,
+            n=self.n,
             iteration_callback=self.iteration_callback,
         )

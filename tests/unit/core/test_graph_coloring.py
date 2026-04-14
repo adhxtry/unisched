@@ -1,3 +1,5 @@
+import pytest
+
 from unisched.core.optimizers.graph_coloring import (
     GraphColoringOptimizer,
     build_conflict_graph,
@@ -83,6 +85,7 @@ def test_graph_coloring_optimizer_iteration_callback_uses_one_based_index() -> N
     optimizer = GraphColoringOptimizer(
         num_tries=4,
         random_seed=0,
+        n=2,
         iteration_callback=seen_iterations.append,
     )
     courses = _sample_courses()
@@ -90,4 +93,12 @@ def test_graph_coloring_optimizer_iteration_callback_uses_one_based_index() -> N
 
     optimizer.optimize(courses, time_slots)
 
-    assert seen_iterations == [1, 2, 3, 4]
+    assert sorted(seen_iterations) == [1, 2, 3, 4]
+
+
+def test_optimize_graph_coloring_rejects_invalid_parallel_worker_count() -> None:
+    courses = _sample_courses()
+    time_slots = [TimeSlot(day=1, slot_index=1), TimeSlot(day=1, slot_index=2)]
+
+    with pytest.raises(ValueError, match="n must be >= 1"):
+        optimize_graph_coloring(courses, time_slots, n=0)
