@@ -39,12 +39,13 @@ from .constraints import (
     calculate_schedule_penalty,
     compute_student_conflicts,
 )
-from .models import Course, ExamEvent, Schedule, TimeSlot
+from .models import Course, ExamEvent, ExamHall, Schedule, TimeSlot
 
 __all__ = [
     "ConflictModel",
     "Course",
     "ExamEvent",
+    "ExamHall",
     "Schedule",
     "TimeSlot",
     "calculate_penalty",

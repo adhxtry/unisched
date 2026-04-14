@@ -32,7 +32,20 @@ class RegDataConfig:
     )
 
 
-class RegDataLoader:
+@dataclass(frozen=True, slots=True)
+class HallDataConfig:
+    """Configuration for exam-hall capacity data loading."""
+
+    hall_col: str = "Hall Name"  # Column name for exam hall identifier
+    capacity_col: str = "Capacity"  # Column name for hall capacity
+    group_col: str = "Group"  # Column name for hall grouping
+    sheet_name: str | int | None = None  # Optional sheet name/index for Excel/ODS files
+    normalizer: Callable[[pd.DataFrame], pd.DataFrame] | None = (
+        None  # Optional function to normalize loaded hall-capacity data
+    )
+
+
+class DataLoader:
     """Load registration data from validated input files."""
 
     def _load_csv(self, file_path: Path) -> pd.DataFrame:
@@ -75,6 +88,57 @@ class RegDataLoader:
 
         return data_frame[[config.student_id_col, config.course_col]]
 
+    def _validate_hall_data(
+        self,
+        data_frame: pd.DataFrame,
+        config: HallDataConfig,
+    ) -> pd.DataFrame:
+        required_columns = {config.hall_col, config.capacity_col, config.group_col}
+        missing_columns = required_columns - set(data_frame.columns)
+
+        if missing_columns:
+            missing_list = ", ".join(sorted(missing_columns))
+            raise ValueError(f"Missing required hall capacity columns: {missing_list}")
+
+        hall_data = data_frame[[config.hall_col, config.capacity_col, config.group_col]].copy()
+        if hall_data[config.capacity_col].isnull().any():
+            raise ValueError("Hall capacity data contains null capacity values")
+        if hall_data[config.group_col].isnull().any():
+            raise ValueError("Hall capacity data contains null group values")
+
+        hall_data[config.capacity_col] = pd.to_numeric(
+            hall_data[config.capacity_col], errors="raise"
+        )
+        hall_data[config.group_col] = pd.to_numeric(hall_data[config.group_col], errors="raise")
+
+        if (hall_data[config.capacity_col] < 1).any():
+            raise ValueError("Hall capacity must be >= 1")
+        if (hall_data[config.group_col] < 0).any():
+            raise ValueError("Hall group must be >= 0")
+
+        hall_data[config.capacity_col] = hall_data[config.capacity_col].astype(int)
+        hall_data[config.group_col] = hall_data[config.group_col].astype(int)
+
+        return hall_data
+
+    def _load_tabular_data(
+        self,
+        input_file: ValidatedFile,
+        sheet_name: str | int | None,
+        *,
+        unsupported_message: str,
+    ) -> pd.DataFrame:
+        extension = input_file.extension
+
+        if extension == ".csv":
+            return self._load_csv(input_file.path)
+        if extension in {".xlsx", ".xls"}:
+            return self._load_excel(input_file.path, sheet_name)
+        if extension == ".ods":
+            return self._load_ods(input_file.path, sheet_name)
+
+        raise ValueError(unsupported_message.format(extension=extension or "<no extension>"))
+
     def load_registration_data(
         self,
         input_file: ValidatedFile,
@@ -95,21 +159,37 @@ class RegDataLoader:
         active_config = config or RegDataConfig()
         logger.info("Loading registration data from %s", input_file.path)
 
-        extension = input_file.extension
-
-        loaded_data: pd.DataFrame
-        if extension == ".csv":
-            loaded_data = self._load_csv(input_file.path)
-        elif extension in {".xlsx", ".xls"}:
-            loaded_data = self._load_excel(input_file.path, active_config.sheet_name)
-        elif extension == ".ods":
-            loaded_data = self._load_ods(input_file.path, active_config.sheet_name)
-        else:
-            raise ValueError(
-                f"Unsupported registration file format: {extension or '<no extension>'}"
-            )
+        loaded_data = self._load_tabular_data(
+            input_file,
+            active_config.sheet_name,
+            unsupported_message=("Unsupported registration file format: {extension}"),
+        )
 
         if active_config.normalizer is not None:
             loaded_data = active_config.normalizer(loaded_data)
 
         return self._validate_loaded_data(loaded_data, active_config)
+
+    def load_hall_capacity_data(
+        self,
+        input_file: ValidatedFile,
+        config: HallDataConfig | None = None,
+    ) -> pd.DataFrame:
+        """Load exam hall-capacity data from a validated tabular file."""
+
+        if not isinstance(input_file, ValidatedFile):
+            raise TypeError("input_file must be a ValidatedFile instance")
+
+        active_config = config or HallDataConfig()
+        logger.info("Loading hall capacity data from %s", input_file.path)
+
+        loaded_data = self._load_tabular_data(
+            input_file,
+            active_config.sheet_name,
+            unsupported_message=("Unsupported hall capacity file format: {extension}"),
+        )
+
+        if active_config.normalizer is not None:
+            loaded_data = active_config.normalizer(loaded_data)
+
+        return self._validate_hall_data(loaded_data, active_config)

@@ -35,7 +35,7 @@ class _ScheduleWorker(QThread):
         try:
             result = schedule(
                 self.request.input_file,
-                config=self.request.config,
+                reg_config=self.request.config,
                 max_days=self.request.max_days,
                 slots_per_day=self.request.slots_per_day,
             )

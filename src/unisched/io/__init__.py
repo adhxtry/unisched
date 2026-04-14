@@ -28,6 +28,6 @@ Planned main classes/functions:
 """
 
 from .files import ValidatedFile
-from .loader import RegDataConfig, RegDataLoader
+from .loader import HallDataConfig, RegDataConfig, DataLoader
 
-__all__ = ["ValidatedFile", "RegDataConfig", "RegDataLoader"]
+__all__ = ["HallDataConfig", "RegDataConfig", "DataLoader", "ValidatedFile"]

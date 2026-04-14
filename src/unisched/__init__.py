@@ -22,13 +22,17 @@ Notes:
 
 from .api import schedule
 from .core import BaseOptimizer, GraphColoringOptimizer, SchedulingCoordinator
-from .domain import Course, ExamEvent, Schedule, TimeSlot
+from .domain import Course, ExamEvent, ExamHall, Schedule, TimeSlot
+from .io import HallDataConfig, RegDataConfig
 
 __all__ = [
     "BaseOptimizer",
     "Course",
     "ExamEvent",
+    "ExamHall",
     "GraphColoringOptimizer",
+    "HallDataConfig",
+    "RegDataConfig",
     "Schedule",
     "SchedulingCoordinator",
     "TimeSlot",

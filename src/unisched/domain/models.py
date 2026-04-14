@@ -32,11 +32,29 @@ class Course:
 
 
 @dataclass(frozen=True, slots=True)
+class ExamHall:
+    """Represent an exam hall with seating capacity and allocation group."""
+
+    hall: str
+    capacity: int
+    group: int
+
+    def __post_init__(self) -> None:
+        if not self.hall:
+            raise ValueError("hall must be a non-empty string")
+        if self.capacity < 1:
+            raise ValueError("capacity must be >= 1")
+        if self.group < 0:
+            raise ValueError("group must be >= 0")
+
+
+@dataclass(frozen=True, slots=True)
 class ExamEvent:
     """Represent a single exam assignment for one course."""
 
     course_code: str
     time_slot: TimeSlot
+    halls: tuple[str, ...] = field(default_factory=tuple)
 
 
 @dataclass(slots=True)

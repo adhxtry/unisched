@@ -8,9 +8,9 @@ from pathlib import Path
 import pandas as pd
 
 from unisched.core.optimizers import BaseOptimizer, GraphColoringOptimizer
-from unisched.domain.models import Course, Schedule, TimeSlot
+from unisched.domain.models import Course, ExamHall, Schedule, TimeSlot
 from unisched.io.files import ValidatedFile
-from unisched.io.loader import RegDataConfig, RegDataLoader
+from unisched.io.loader import HallDataConfig, RegDataConfig, DataLoader
 
 
 class SchedulingCoordinator:
@@ -26,7 +26,7 @@ class SchedulingCoordinator:
         self.optimizer = optimizer or GraphColoringOptimizer()
         self.slots_per_day = slots_per_day
         self.max_days = max_days
-        self.loader = RegDataLoader()
+        self.loader = DataLoader()
 
     def _build_courses(self, data: pd.DataFrame, config: RegDataConfig) -> list[Course]:
         courses: list[Course] = []
@@ -38,6 +38,21 @@ class SchedulingCoordinator:
 
         courses.sort(key=lambda course: course.code)
         return courses
+
+    def _build_halls(self, data: pd.DataFrame, config: HallDataConfig) -> list[ExamHall]:
+        halls: list[ExamHall] = []
+
+        for _, row in data.iterrows():
+            halls.append(
+                ExamHall(
+                    hall=str(row[config.hall_col]),
+                    capacity=int(row[config.capacity_col]),
+                    group=int(row[config.group_col]),
+                )
+            )
+
+        halls.sort(key=lambda hall: (hall.group, hall.capacity, hall.hall))
+        return halls
 
     def _generate_time_slots(self, course_count: int) -> list[TimeSlot]:
         if self.slots_per_day < 1:
@@ -61,7 +76,10 @@ class SchedulingCoordinator:
     def load_and_schedule(
         self,
         input_file: str | Path | ValidatedFile,
-        config: RegDataConfig | None = None,
+        reg_config: RegDataConfig | None = None,
+        *,
+        hall_capacity_file: str | Path | ValidatedFile | None = None,
+        hall_config: HallDataConfig | None = None,
     ) -> Schedule:
         """Load registration data and return an exam schedule."""
 
@@ -71,9 +89,23 @@ class SchedulingCoordinator:
             else ValidatedFile.from_path(input_file)
         )
 
-        active_config = config or RegDataConfig()
+        active_config = reg_config or RegDataConfig()
         data = self.loader.load_registration_data(validated_file, active_config)
         courses = self._build_courses(data, active_config)
         time_slots = self._generate_time_slots(len(courses))
+        halls: list[ExamHall] | None = None
 
-        return self.optimizer.optimize(courses, time_slots)
+        if hall_capacity_file is not None:
+            validated_hall_file = (
+                hall_capacity_file
+                if isinstance(hall_capacity_file, ValidatedFile)
+                else ValidatedFile.from_path(hall_capacity_file)
+            )
+            active_hall_config = hall_config or HallDataConfig()
+            hall_data = self.loader.load_hall_capacity_data(
+                validated_hall_file,
+                active_hall_config,
+            )
+            halls = self._build_halls(hall_data, active_hall_config)
+
+        return self.optimizer.optimize(courses, time_slots, halls=halls)
