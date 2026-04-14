@@ -12,26 +12,40 @@
 
 This is my (Adheesh Trivedi's) submission for the course "Advanced Programming".
 
-Unisched is a basic, modular exam scheduling project that currently supports:
+**Unisched** is a basic, modular exam scheduling project that currently supports:
 
-- Registration data loading from CSV, Excel, and ODS
+- Registration data loading from CSV, Excel and ODS
+- Exam hall data loading from CSV, Excel and ODS
 - Core scheduling using a graph coloring optimizer (DSatur-based)
 - Conflict-aware schedule generation with simple penalty calculation
-- A desktop GUI built with PySide6
+- A native-desktop GUI built with PySide6
 
 The project is intentionally minimal and designed to be extended over time.
 
-## Current Architecture
+## Installation
 
-- `unisched.io`: file handling and registration-data loading
-- `unisched.domain`: schedule models and conflict/penalty helpers
-- `unisched.core`: coordinator and optimizer interfaces/implementations
-- `unisched.gui`: desktop user interface
+### From PyPI
 
-## Requirements
+```bash
+pip install unisched
+
+# Then run the app
+python -m unisched
+```
+
+It's recommended to use `pipx` for better dependency resolution:
+
+```bash
+pipx install unisched
+
+# Then run the app
+unisched
+```
+
+### Running from source
 
 - Python 3.12
-- `uv` package manager
+- [`uv` package manager](https://github.com/astral-sh/uv)
 
 Dependencies used by the project:
 
@@ -39,8 +53,6 @@ Dependencies used by the project:
 - PySide6
 - openpyxl
 - odfpy
-
-## Quick Start
 
 Install dependencies:
 
@@ -51,27 +63,29 @@ uv sync
 Run the GUI app:
 
 ```bash
-uv run python -m unisched
+uv run unisched
 ```
 
-## Running Tests
+### Running Tests
 
 Run all tests:
 
 ```bash
+uv sync --extra dev
 uv run pytest
 ```
 
-## Example Script
+### Example Script
 
 Run the sample scheduling script:
 
 ```bash
+uv sync --extra example
 uv run python examples/schedule.py
 ```
 
-## Notes
+## TODOs
 
 - Current optimizer implementation: GraphColoringOptimizer only
 - Future optimizers (for later): Simulated Annealing, ILP
-- GUI tests are currently not included
+- Needs a cute logo for the GUI :)

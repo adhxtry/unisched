@@ -64,14 +64,14 @@ class DataLoader:
             excel_file = pd.ExcelFile(input_file.path, engine=engine)
             sheet_columns: dict[str, list[str]] = {}
             for sheet_name in excel_file.sheet_names:
-                frame = pd.read_excel(input_file.path, sheet_name=sheet_name, nrows=0, engine=engine)
+                frame = pd.read_excel(
+                    input_file.path, sheet_name=sheet_name, nrows=0, engine=engine
+                )
                 sheet_columns[str(sheet_name)] = [str(column) for column in frame.columns]
 
             return sheet_columns
 
-        raise ValueError(
-            f"Unsupported file format for preload: {extension or '<no extension>'}"
-        )
+        raise ValueError(f"Unsupported file format for preload: {extension or '<no extension>'}")
 
     def _load_csv(self, file_path: Path) -> pd.DataFrame:
         logger.info("Loading CSV registration data from %s", file_path)

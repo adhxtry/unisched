@@ -33,7 +33,9 @@ def clone_grouped_halls(grouped_halls: GroupedHalls) -> GroupedHalls:
     return [group[:] for group in grouped_halls]
 
 
-def build_slot_hall_inventory(slot_count: int, grouped_halls: GroupedHalls) -> dict[int, GroupedHalls]:
+def build_slot_hall_inventory(
+    slot_count: int, grouped_halls: GroupedHalls
+) -> dict[int, GroupedHalls]:
     """Create independent hall inventories for each slot index."""
 
     if slot_count < 1:

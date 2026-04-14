@@ -5,8 +5,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "unisched"
-version = "0.1.0"
-description = "An exam scheduler application built with Python, designed to efficiently manage and optimize exam schedules at university level."
+version = "0.1.1"
+description = "An exam scheduler application built with Python, designed to optimize exam schedules at university level."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -15,14 +15,23 @@ dependencies = [
     "pandas>=3.0.2",
     "pyside6>=6.7,<6.8",
 ]
+authors = [
+    { name = "Adheesh Trivedi", email = "adheeshtrivedi@gmail.com" }
+]
 
 [project.scripts]
 unisched = "unisched.__main__:main"
 
 [project.optional-dependencies]
-deploy = ["nuitka", "zstandard"]  # deployment-only deps
 dev = ["black", "pytest", "pytest-qt"]  # development-only deps
 example = ["tqdm"]  # example-only deps
+
+[tool.hatch.build]
+include = [
+  "/src",
+  "/README.md",
+  "/LICENSE",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/unisched"]
