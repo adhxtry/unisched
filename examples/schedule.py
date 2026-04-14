@@ -8,17 +8,29 @@ from __future__ import annotations
 from pathlib import Path
 
 from unisched import schedule
-from unisched.io.loader import RegDataConfig
+from unisched.io import HallDataConfig, RegDataConfig
+from unisched.core import SchedulingCoordinator, GraphColoringOptimizer
 
 
 def main() -> None:
     base_dir = Path(__file__).resolve().parent
     input_file = base_dir / "data" / "anonymous-registration-data.csv"
+    hall_file = base_dir / "data" / "hall_cap.csv"
+
+    coordinator = SchedulingCoordinator(
+        optimizer=GraphColoringOptimizer(num_tries=1000, random_seed=42),
+        slots_per_day=2,
+        max_days=8,
+    )
 
     result = schedule(
         input_file,
-        config=RegDataConfig(student_id_col="Name", course_col="Course Title"),
-        max_days=8,
+        reg_config=RegDataConfig(student_id_col="Name", course_col="Course Title"),
+        hall_capacity_file=hall_file,
+        hall_config=HallDataConfig(
+            hall_col="Hall Name", capacity_col="Half Capacity", group_col="Group"
+        ),
+        coordinator=coordinator,
     )
 
     print(f"Total exams: {len(result.events)}")
@@ -27,9 +39,10 @@ def main() -> None:
     print("First 10 assignments:")
 
     for event in result.events[:10]:
+        halls = ", ".join(event.halls) if event.halls else "<none>"
         print(
             f"  {event.course_code}: day {event.time_slot.day}, "
-            f"slot {event.time_slot.slot_index}"
+            f"slot {event.time_slot.slot_index}, halls {halls}"
         )
 
 

@@ -36,9 +36,9 @@ class RegDataConfig:
 class HallDataConfig:
     """Configuration for exam-hall capacity data loading."""
 
-    hall_col: str = "Hall Name"  # Column name for exam hall identifier
-    capacity_col: str = "Capacity"  # Column name for hall capacity
-    group_col: str = "Group"  # Column name for hall grouping
+    hall_col: str = "hall"  # Column name for exam hall identifier
+    capacity_col: str = "capacity"  # Column name for hall capacity
+    group_col: str = "group"  # Column name for hall grouping
     sheet_name: str | int | None = None  # Optional sheet name/index for Excel/ODS files
     normalizer: Callable[[pd.DataFrame], pd.DataFrame] | None = (
         None  # Optional function to normalize loaded hall-capacity data
