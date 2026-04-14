@@ -289,3 +289,51 @@ def test_load_hall_capacity_data_rejects_non_validated_file() -> None:
 
     with pytest.raises(TypeError, match="ValidatedFile"):
         loader.load_hall_capacity_data("not-a-validated-file")  # type: ignore[arg-type]
+
+
+def test_preload_sheet_columns_map_reads_csv_columns(tmp_path: Path) -> None:
+    """Preload should expose CSV columns under a synthetic sheet key."""
+
+    input_path = tmp_path / "registration.csv"
+    pd.DataFrame({"student_id": [1], "course": ["math"]}).to_csv(input_path, index=False)
+
+    loader = DataLoader()
+    input_file = ValidatedFile.from_path(input_path)
+
+    result = loader.preload_sheet_columns_map(input_file)
+
+    assert result == {"CSV": ["student_id", "course"]}
+
+
+def test_preload_sheet_columns_map_reads_excel_sheet_columns(tmp_path: Path) -> None:
+    """Preload should list all Excel sheets and their header columns."""
+
+    input_path = tmp_path / "registration.xlsx"
+    with pd.ExcelWriter(input_path, engine="openpyxl") as writer:
+        pd.DataFrame({"sid": [1], "unit": ["math"]}).to_excel(
+            writer,
+            sheet_name="Registrations",
+            index=False,
+        )
+        pd.DataFrame({"a": [1]}).to_excel(writer, sheet_name="Other", index=False)
+
+    loader = DataLoader()
+    input_file = ValidatedFile.from_path(input_path)
+
+    result = loader.preload_sheet_columns_map(input_file)
+
+    assert result["Registrations"] == ["sid", "unit"]
+    assert result["Other"] == ["a"]
+
+
+def test_preload_sheet_columns_map_rejects_unsupported_extension(tmp_path: Path) -> None:
+    """Preload should reject unsupported file formats."""
+
+    input_path = tmp_path / "notes.txt"
+    input_path.write_text("hello", encoding="utf-8")
+
+    loader = DataLoader()
+    input_file = ValidatedFile.from_path(input_path)
+
+    with pytest.raises(ValueError, match="Unsupported file format for preload"):
+        loader.preload_sheet_columns_map(input_file)

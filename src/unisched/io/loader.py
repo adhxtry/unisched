@@ -48,6 +48,31 @@ class HallDataConfig:
 class DataLoader:
     """Load registration data from validated input files."""
 
+    def preload_sheet_columns_map(self, input_file: ValidatedFile) -> dict[str, list[str]]:
+        """Return available sheet names mapped to their column names."""
+
+        if not isinstance(input_file, ValidatedFile):
+            raise TypeError("input_file must be a ValidatedFile instance")
+
+        extension = input_file.extension
+        if extension == ".csv":
+            frame = pd.read_csv(input_file.path, nrows=0)
+            return {"CSV": [str(column) for column in frame.columns]}
+
+        if extension in {".xlsx", ".xls", ".ods"}:
+            engine = "odf" if extension == ".ods" else None
+            excel_file = pd.ExcelFile(input_file.path, engine=engine)
+            sheet_columns: dict[str, list[str]] = {}
+            for sheet_name in excel_file.sheet_names:
+                frame = pd.read_excel(input_file.path, sheet_name=sheet_name, nrows=0, engine=engine)
+                sheet_columns[str(sheet_name)] = [str(column) for column in frame.columns]
+
+            return sheet_columns
+
+        raise ValueError(
+            f"Unsupported file format for preload: {extension or '<no extension>'}"
+        )
+
     def _load_csv(self, file_path: Path) -> pd.DataFrame:
         logger.info("Loading CSV registration data from %s", file_path)
         return pd.read_csv(file_path)

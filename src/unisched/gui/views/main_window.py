@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
+from PySide6.QtGui import QCloseEvent
+from PySide6.QtCore import QStandardPaths
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -47,6 +52,7 @@ class MainWindow(QMainWindow):
 
         self._setup_layout()
         self._connect_signals()
+        self._load_ui_state()
 
     def _setup_layout(self) -> None:
         central_widget = QWidget(self)
@@ -161,3 +167,49 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Schedule exported")
         except Exception as exc:  # noqa: BLE001 - GUI should surface failures
             QMessageBox.critical(self, "Export Failed", str(exc))
+
+    def _ui_state_path(self) -> Path:
+        base_dir = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+        if not base_dir:
+            base_dir = str(Path.home() / ".unisched")
+
+        state_dir = Path(base_dir)
+        state_dir.mkdir(parents=True, exist_ok=True)
+        return state_dir / "ui_state.json"
+
+    def _load_ui_state(self) -> None:
+        state_path = self._ui_state_path()
+        if not state_path.exists():
+            return
+
+        try:
+            state_payload = json.loads(state_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+
+        config_state = state_payload.get("config_form", {})
+        if isinstance(config_state, dict):
+            self.config_form.apply_ui_state(config_state)
+
+        tab_index = state_payload.get("active_tab")
+        if isinstance(tab_index, int) and 0 <= tab_index < self.tabs.count():
+            self.tabs.setCurrentIndex(tab_index)
+
+    def _save_ui_state(self) -> None:
+        state_payload = {
+            "active_tab": self.tabs.currentIndex(),
+            "config_form": self.config_form.get_ui_state(),
+        }
+        state_path = self._ui_state_path()
+        state_path.write_text(
+            json.dumps(state_payload, indent=2),
+            encoding="utf-8",
+        )
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        try:
+            self._save_ui_state()
+        except OSError:
+            pass
+
+        super().closeEvent(event)

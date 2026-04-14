@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PySide6.QtWidgets import (
+    QComboBox,
     QFileDialog,
     QCheckBox,
     QFormLayout,
@@ -17,7 +18,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from unisched.io.files import ValidatedFile
 from unisched.io.loader import HallDataConfig, RegDataConfig
+from unisched.io.loader import DataLoader
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,16 +43,21 @@ class ConfigFormWidget(QWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self._loader = DataLoader()
+        self._registration_sheet_columns: dict[str, list[str]] = {}
+        self._hall_sheet_columns: dict[str, list[str]] = {}
 
         layout = QVBoxLayout(self)
 
         registration_group = QGroupBox("Registration Configuration", self)
         registration_layout = QFormLayout(registration_group)
 
-        self.student_col_input = QLineEdit("student_id")
-        self.course_col_input = QLineEdit("course")
-        self.sheet_name_input = QLineEdit("")
-        self.sheet_name_input.setPlaceholderText("Optional sheet name/index")
+        self.student_col_combo = QComboBox(self)
+        self.course_col_combo = QComboBox(self)
+        self.sheet_name_combo = QComboBox(self)
+        self.student_col_combo.setEnabled(False)
+        self.course_col_combo.setEnabled(False)
+        self.sheet_name_combo.setEnabled(False)
 
         self.registration_file_input = QLineEdit("")
         self.registration_file_input.setReadOnly(True)
@@ -64,9 +72,9 @@ class ConfigFormWidget(QWidget):
         registration_file_layout.addWidget(browse_registration_button)
 
         registration_layout.addRow("Registration file", registration_file_row)
-        registration_layout.addRow("Student ID column", self.student_col_input)
-        registration_layout.addRow("Course column", self.course_col_input)
-        registration_layout.addRow("Sheet name/index", self.sheet_name_input)
+        registration_layout.addRow("Sheet", self.sheet_name_combo)
+        registration_layout.addRow("Student ID column", self.student_col_combo)
+        registration_layout.addRow("Course column", self.course_col_combo)
 
         hall_group = QGroupBox("Exam Hall Configuration", self)
         hall_layout = QFormLayout(hall_group)
@@ -83,17 +91,20 @@ class ConfigFormWidget(QWidget):
         browse_hall_button.clicked.connect(self._browse_hall_file)
         hall_file_layout.addWidget(browse_hall_button)
 
-        self.hall_col_input = QLineEdit("hall")
-        self.hall_capacity_col_input = QLineEdit("capacity")
-        self.hall_group_col_input = QLineEdit("group")
-        self.hall_sheet_name_input = QLineEdit("")
-        self.hall_sheet_name_input.setPlaceholderText("Optional sheet name/index")
+        self.hall_col_combo = QComboBox(self)
+        self.hall_capacity_col_combo = QComboBox(self)
+        self.hall_group_col_combo = QComboBox(self)
+        self.hall_sheet_name_combo = QComboBox(self)
+        self.hall_col_combo.setEnabled(False)
+        self.hall_capacity_col_combo.setEnabled(False)
+        self.hall_group_col_combo.setEnabled(False)
+        self.hall_sheet_name_combo.setEnabled(False)
 
         hall_layout.addRow("Hall capacity file", hall_file_row)
-        hall_layout.addRow("Hall column", self.hall_col_input)
-        hall_layout.addRow("Capacity column", self.hall_capacity_col_input)
-        hall_layout.addRow("Group column", self.hall_group_col_input)
-        hall_layout.addRow("Sheet name/index", self.hall_sheet_name_input)
+        hall_layout.addRow("Sheet", self.hall_sheet_name_combo)
+        hall_layout.addRow("Hall column", self.hall_col_combo)
+        hall_layout.addRow("Capacity column", self.hall_capacity_col_combo)
+        hall_layout.addRow("Group column", self.hall_group_col_combo)
 
         optimizer_group = QGroupBox("Optimizer Configuration", self)
         optimizer_layout = QFormLayout(optimizer_group)
@@ -138,12 +149,8 @@ class ConfigFormWidget(QWidget):
         layout.addWidget(optimizer_group)
         layout.addStretch(1)
 
-    def _parse_sheet_name(self, sheet_name_raw: str) -> str | int | None:
-        if sheet_name_raw == "":
-            return None
-        if sheet_name_raw.isdigit():
-            return int(sheet_name_raw)
-        return sheet_name_raw
+        self.sheet_name_combo.currentIndexChanged.connect(self._refresh_registration_column_combos)
+        self.hall_sheet_name_combo.currentIndexChanged.connect(self._refresh_hall_column_combos)
 
     def _browse_hall_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -154,6 +161,7 @@ class ConfigFormWidget(QWidget):
         )
         if path:
             self.hall_file_input.setText(path)
+            self._preload_hall_file(path)
 
     def _browse_registration_file(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -164,26 +172,205 @@ class ConfigFormWidget(QWidget):
         )
         if path:
             self.registration_file_input.setText(path)
+            self._preload_registration_file(path)
+
+    def _reset_combo(self, combo: QComboBox) -> None:
+        combo.clear()
+        combo.setEnabled(False)
+
+    def _set_combo_items(self, combo: QComboBox, items: list[str], preferred: str | None) -> None:
+        combo.clear()
+        combo.addItems(items)
+        combo.setEnabled(bool(items))
+        if preferred and preferred in items:
+            combo.setCurrentText(preferred)
+
+    def _preferred_column(self, columns: list[str], options: tuple[str, ...]) -> str | None:
+        lowered = {column.lower(): column for column in columns}
+        for option in options:
+            if option.lower() in lowered:
+                return lowered[option.lower()]
+        return None
+
+    def _selected_sheet_name(self, combo: QComboBox) -> str | None:
+        sheet_name = combo.currentText().strip()
+        if not sheet_name or sheet_name == "CSV":
+            return None
+        return sheet_name
+
+    def _columns_for_selected_sheet(
+        self,
+        sheet_map: dict[str, list[str]],
+        sheet_combo: QComboBox,
+    ) -> list[str]:
+        if not sheet_map:
+            return []
+
+        selected_sheet = sheet_combo.currentText().strip()
+        if not selected_sheet:
+            return []
+
+        return sheet_map.get(selected_sheet, [])
+
+    def _preload_registration_file(self, file_path: str) -> None:
+        try:
+            validated_file = ValidatedFile.from_path(file_path)
+            self._registration_sheet_columns = self._loader.preload_sheet_columns_map(
+                validated_file
+            )
+            self._set_combo_items(
+                self.sheet_name_combo,
+                list(self._registration_sheet_columns.keys()),
+                preferred=self.sheet_name_combo.currentText() or None,
+            )
+            self._refresh_registration_column_combos()
+        except Exception as exc:  # noqa: BLE001 - show preload failures in form
+            self._registration_sheet_columns = {}
+            self._reset_combo(self.sheet_name_combo)
+            self._reset_combo(self.student_col_combo)
+            self._reset_combo(self.course_col_combo)
+            self.sheet_name_combo.addItem("Error")
+            self.sheet_name_combo.setToolTip(str(exc))
+
+    def _preload_hall_file(self, file_path: str) -> None:
+        try:
+            validated_file = ValidatedFile.from_path(file_path)
+            self._hall_sheet_columns = self._loader.preload_sheet_columns_map(validated_file)
+            self._set_combo_items(
+                self.hall_sheet_name_combo,
+                list(self._hall_sheet_columns.keys()),
+                preferred=self.hall_sheet_name_combo.currentText() or None,
+            )
+            self._refresh_hall_column_combos()
+        except Exception as exc:  # noqa: BLE001 - show preload failures in form
+            self._hall_sheet_columns = {}
+            self._reset_combo(self.hall_sheet_name_combo)
+            self._reset_combo(self.hall_col_combo)
+            self._reset_combo(self.hall_capacity_col_combo)
+            self._reset_combo(self.hall_group_col_combo)
+            self.hall_sheet_name_combo.addItem("Error")
+            self.hall_sheet_name_combo.setToolTip(str(exc))
+
+    def _refresh_registration_column_combos(self) -> None:
+        columns = self._columns_for_selected_sheet(
+            self._registration_sheet_columns,
+            self.sheet_name_combo,
+        )
+
+        preferred_student = self._preferred_column(columns, ("student_id", "student", "name"))
+        preferred_course = self._preferred_column(columns, ("course", "course_title", "title"))
+        self._set_combo_items(self.student_col_combo, columns, preferred_student)
+        self._set_combo_items(self.course_col_combo, columns, preferred_course)
+
+    def _refresh_hall_column_combos(self) -> None:
+        columns = self._columns_for_selected_sheet(
+            self._hall_sheet_columns,
+            self.hall_sheet_name_combo,
+        )
+
+        preferred_hall = self._preferred_column(columns, ("hall", "hall name"))
+        preferred_capacity = self._preferred_column(columns, ("capacity", "half capacity"))
+        preferred_group = self._preferred_column(columns, ("group",))
+
+        self._set_combo_items(self.hall_col_combo, columns, preferred_hall)
+        self._set_combo_items(self.hall_capacity_col_combo, columns, preferred_capacity)
+        self._set_combo_items(self.hall_group_col_combo, columns, preferred_group)
+
+    def get_ui_state(self) -> dict[str, str | int | bool]:
+        """Return a serializable snapshot of form values for persistence."""
+
+        return {
+            "registration_file": self.registration_file_input.text(),
+            "student_col": self.student_col_combo.currentText(),
+            "course_col": self.course_col_combo.currentText(),
+            "sheet_name": self.sheet_name_combo.currentText(),
+            "hall_file": self.hall_file_input.text(),
+            "hall_col": self.hall_col_combo.currentText(),
+            "hall_capacity_col": self.hall_capacity_col_combo.currentText(),
+            "hall_group_col": self.hall_group_col_combo.currentText(),
+            "hall_sheet_name": self.hall_sheet_name_combo.currentText(),
+            "slots_per_day": self.slots_per_day_input.value(),
+            "limit_days": self.limit_days_checkbox.isChecked(),
+            "max_days": self.max_days_input.value(),
+            "num_tries": self.num_tries_input.value(),
+            "random_seed": self.random_seed_input.value(),
+            "n": self.n_input.value(),
+        }
+
+    def apply_ui_state(self, state: dict[str, str | int | bool]) -> None:
+        """Apply persisted form values and refresh preload metadata labels."""
+
+        registration_file = str(state.get("registration_file", ""))
+        self.registration_file_input.setText(registration_file)
+
+        hall_file = str(state.get("hall_file", ""))
+        self.hall_file_input.setText(hall_file)
+
+        self.slots_per_day_input.setValue(int(state.get("slots_per_day", 2)))
+        self.limit_days_checkbox.setChecked(bool(state.get("limit_days", False)))
+        self.max_days_input.setValue(int(state.get("max_days", 14)))
+        self.num_tries_input.setValue(int(state.get("num_tries", 32)))
+        self.random_seed_input.setValue(int(state.get("random_seed", 0)))
+        self.n_input.setValue(int(state.get("n", 4)))
+
+        if registration_file:
+            self._preload_registration_file(registration_file)
+        if hall_file:
+            self._preload_hall_file(hall_file)
+
+        saved_sheet = str(state.get("sheet_name", ""))
+        saved_student_col = str(state.get("student_col", ""))
+        saved_course_col = str(state.get("course_col", ""))
+        saved_hall_sheet = str(state.get("hall_sheet_name", ""))
+        saved_hall_col = str(state.get("hall_col", ""))
+        saved_capacity_col = str(state.get("hall_capacity_col", ""))
+        saved_group_col = str(state.get("hall_group_col", ""))
+
+        if saved_sheet and self.sheet_name_combo.findText(saved_sheet) >= 0:
+            self.sheet_name_combo.setCurrentText(saved_sheet)
+        if saved_student_col and self.student_col_combo.findText(saved_student_col) >= 0:
+            self.student_col_combo.setCurrentText(saved_student_col)
+        if saved_course_col and self.course_col_combo.findText(saved_course_col) >= 0:
+            self.course_col_combo.setCurrentText(saved_course_col)
+
+        if saved_hall_sheet and self.hall_sheet_name_combo.findText(saved_hall_sheet) >= 0:
+            self.hall_sheet_name_combo.setCurrentText(saved_hall_sheet)
+        if saved_hall_col and self.hall_col_combo.findText(saved_hall_col) >= 0:
+            self.hall_col_combo.setCurrentText(saved_hall_col)
+        if saved_capacity_col and self.hall_capacity_col_combo.findText(saved_capacity_col) >= 0:
+            self.hall_capacity_col_combo.setCurrentText(saved_capacity_col)
+        if saved_group_col and self.hall_group_col_combo.findText(saved_group_col) >= 0:
+            self.hall_group_col_combo.setCurrentText(saved_group_col)
+
+        if not registration_file:
+            self._reset_combo(self.sheet_name_combo)
+            self._reset_combo(self.student_col_combo)
+            self._reset_combo(self.course_col_combo)
+        if not hall_file:
+            self._reset_combo(self.hall_sheet_name_combo)
+            self._reset_combo(self.hall_col_combo)
+            self._reset_combo(self.hall_capacity_col_combo)
+            self._reset_combo(self.hall_group_col_combo)
 
     def get_options(self) -> SchedulingOptions:
         """Build scheduling options from current form values."""
 
-        parsed_sheet_name = self._parse_sheet_name(self.sheet_name_input.text().strip())
+        parsed_sheet_name = self._selected_sheet_name(self.sheet_name_combo)
 
         reg_config = RegDataConfig(
-            student_id_col=self.student_col_input.text().strip(),
-            course_col=self.course_col_input.text().strip(),
+            student_id_col=self.student_col_combo.currentText().strip(),
+            course_col=self.course_col_combo.currentText().strip(),
             sheet_name=parsed_sheet_name,
         )
 
         hall_file_raw = self.hall_file_input.text().strip()
-        parsed_hall_sheet_name = self._parse_sheet_name(self.hall_sheet_name_input.text().strip())
+        parsed_hall_sheet_name = self._selected_sheet_name(self.hall_sheet_name_combo)
         hall_capacity_file = hall_file_raw if hall_file_raw else None
         hall_config = (
             HallDataConfig(
-                hall_col=self.hall_col_input.text().strip(),
-                capacity_col=self.hall_capacity_col_input.text().strip(),
-                group_col=self.hall_group_col_input.text().strip(),
+                hall_col=self.hall_col_combo.currentText().strip(),
+                capacity_col=self.hall_capacity_col_combo.currentText().strip(),
+                group_col=self.hall_group_col_combo.currentText().strip(),
                 sheet_name=parsed_hall_sheet_name,
             )
             if hall_capacity_file
