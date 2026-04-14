@@ -7,6 +7,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import tqdm
+
 from unisched import schedule
 from unisched.io import HallDataConfig, RegDataConfig
 from unisched.core import SchedulingCoordinator, GraphColoringOptimizer
@@ -17,8 +19,16 @@ def main() -> None:
     input_file = base_dir / "data" / "anonymous-registration-data.csv"
     hall_file = base_dir / "data" / "hall_cap.csv"
 
+    MAX_TRIES = 1000
+
+    progress_bar = tqdm.tqdm(total=MAX_TRIES, desc="Optimizing")
+
     coordinator = SchedulingCoordinator(
-        optimizer=GraphColoringOptimizer(num_tries=1000, random_seed=42),
+        optimizer=GraphColoringOptimizer(
+            num_tries=MAX_TRIES,
+            random_seed=42,
+            iteration_callback=lambda i: progress_bar.update(1),
+        ),
         slots_per_day=2,
         max_days=8,
     )
@@ -32,6 +42,8 @@ def main() -> None:
         ),
         coordinator=coordinator,
     )
+
+    progress_bar.close()
 
     print(f"Total exams: {len(result.events)}")
     print(f"Unscheduled courses: {len(result.unscheduled_courses)}")

@@ -22,6 +22,7 @@ unisched = "unisched.__main__:main"
 [project.optional-dependencies]
 deploy = ["nuitka", "zstandard"]  # deployment-only deps
 dev = ["black", "pytest", "pytest-qt"]  # development-only deps
+example = ["tqdm"]  # example-only deps
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/unisched"]

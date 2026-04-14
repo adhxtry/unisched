@@ -166,9 +166,9 @@ def test_load_hall_capacity_data_reads_csv(tmp_path: Path) -> None:
     input_path = tmp_path / "halls.csv"
     expected = pd.DataFrame(
         {
-            "Hall Name": ["AB-1", "AB-2"],
-            "Capacity": [25, 40],
-            "Group": [3, 3],
+            "hall": ["AB-1", "AB-2"],
+            "capacity": [25, 40],
+            "group": [3, 3],
         }
     )
     expected.to_csv(input_path, index=False)
@@ -187,9 +187,9 @@ def test_load_hall_capacity_data_reads_excel_sheet(tmp_path: Path) -> None:
     input_path = tmp_path / "halls.xlsx"
     expected = pd.DataFrame(
         {
-            "Hall Name": ["L-1"],
-            "Capacity": [300],
-            "Group": [1],
+            "hall": ["L-1"],
+            "capacity": [300],
+            "group": [1],
         }
     )
 
@@ -214,9 +214,9 @@ def test_load_hall_capacity_data_reads_ods(tmp_path: Path) -> None:
     input_path = tmp_path / "halls.ods"
     expected = pd.DataFrame(
         {
-            "Hall Name": ["AB-1"],
-            "Capacity": [25],
-            "Group": [3],
+            "hall": ["AB-1"],
+            "capacity": [25],
+            "group": [3],
         }
     )
     expected.to_excel(input_path, index=False, engine="odf")
@@ -251,9 +251,9 @@ def test_load_hall_capacity_data_applies_normalizer(tmp_path: Path) -> None:
     def normalize_hall_columns(data_frame: pd.DataFrame) -> pd.DataFrame:
         return data_frame.rename(
             columns={
-                "hall": "Hall Name",
-                "cap": "Capacity",
-                "grp": "Group",
+                "hall": "hall",
+                "cap": "capacity",
+                "grp": "group",
             }
         )
 
@@ -265,7 +265,7 @@ def test_load_hall_capacity_data_applies_normalizer(tmp_path: Path) -> None:
         HallDataConfig(normalizer=normalize_hall_columns),
     )
 
-    expected = pd.DataFrame({"Hall Name": ["A"], "Capacity": [10], "Group": [0]})
+    expected = pd.DataFrame({"hall": ["A"], "capacity": [10], "group": [0]})
     pd.testing.assert_frame_equal(result, expected)
 
 

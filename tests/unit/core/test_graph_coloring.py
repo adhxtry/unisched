@@ -1,4 +1,5 @@
 from unisched.core.optimizers.graph_coloring import (
+    GraphColoringOptimizer,
     build_conflict_graph,
     optimize_graph_coloring,
 )
@@ -74,3 +75,19 @@ def test_optimize_graph_coloring_respects_hard_group_constraint() -> None:
 
     assert schedule.events == []
     assert schedule.unscheduled_courses == ["A"]
+
+
+def test_graph_coloring_optimizer_iteration_callback_uses_one_based_index() -> None:
+    seen_iterations: list[int] = []
+
+    optimizer = GraphColoringOptimizer(
+        num_tries=4,
+        random_seed=0,
+        iteration_callback=seen_iterations.append,
+    )
+    courses = _sample_courses()
+    time_slots = [TimeSlot(day=1, slot_index=1), TimeSlot(day=1, slot_index=2)]
+
+    optimizer.optimize(courses, time_slots)
+
+    assert seen_iterations == [1, 2, 3, 4]

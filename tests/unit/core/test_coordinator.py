@@ -79,9 +79,9 @@ def test_coordinator_load_and_schedule_with_hall_capacity(tmp_path: Path) -> Non
 
     pd.DataFrame(
         {
-            "Hall Name": ["L-1", "L-2"],
-            "Capacity": [2, 2],
-            "Group": [1, 1],
+            "hall": ["L-1", "L-2"],
+            "capacity": [2, 2],
+            "group": [1, 1],
         }
     ).to_csv(hall_path, index=False)
 

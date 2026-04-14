@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Iterator
+from typing import Callable, Iterator
 
 from unisched.core.hall_allocation import (
     GroupedHalls,
@@ -164,6 +164,7 @@ def optimize_graph_coloring(
     halls: list[ExamHall] | None = None,
     num_tries: int = 32,
     random_seed: int = 0,
+    iteration_callback: Callable[[int], None] | None = None,
 ) -> Schedule:
     """Run repeated DSatur coloring and keep the best schedule found."""
 
@@ -185,6 +186,7 @@ def optimize_graph_coloring(
 
     # Run multiple attempts with different random seeds to find a better coloring
     for attempt in range(num_tries):
+        iteration = attempt + 1
         rng = random.Random(random_seed + attempt)
         hall_inventory_by_slot = (
             build_slot_hall_inventory(len(time_slots), grouped_halls_template)
@@ -199,6 +201,9 @@ def optimize_graph_coloring(
             hall_inventory_by_slot,
             randomize=attempt > 0,  # Only randomize after the first attempt
         )
+        if iteration_callback is not None:
+            iteration_callback(iteration)
+
         if coloring is None:
             continue
 
@@ -227,9 +232,15 @@ def optimize_graph_coloring(
 class GraphColoringOptimizer(BaseOptimizer):
     """Concrete optimizer that schedules courses using graph coloring."""
 
-    def __init__(self, num_tries: int = 32, random_seed: int = 0) -> None:
+    def __init__(
+        self,
+        num_tries: int = 32,
+        random_seed: int = 0,
+        iteration_callback: Callable[[int], None] | None = None,
+    ) -> None:
         self.num_tries = num_tries
         self.random_seed = random_seed
+        self.iteration_callback = iteration_callback
 
     def optimize(
         self,
@@ -244,4 +255,5 @@ class GraphColoringOptimizer(BaseOptimizer):
             halls=halls,
             num_tries=self.num_tries,
             random_seed=self.random_seed,
+            iteration_callback=self.iteration_callback,
         )
