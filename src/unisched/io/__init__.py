@@ -28,6 +28,14 @@ Planned main classes/functions:
 """
 
 from .files import ValidatedFile
+from .exporter import save_schedule_to_csv, schedule_to_dataframe
 from .loader import HallDataConfig, RegDataConfig, DataLoader
 
-__all__ = ["HallDataConfig", "RegDataConfig", "DataLoader", "ValidatedFile"]
+__all__ = [
+    "DataLoader",
+    "HallDataConfig",
+    "RegDataConfig",
+    "ValidatedFile",
+    "save_schedule_to_csv",
+    "schedule_to_dataframe",
+]
