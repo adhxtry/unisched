@@ -8,11 +8,12 @@
     // =========================
     "languages": {
         "Python": {
+            "language_servers": ["!basedpyright", "pyright"],
             "formatter": {
                 "external": {
-                    "command": "black"
-                }
-            }
-        }
-    }
+                    "command": "black",
+                },
+            },
+        },
+    },
 }
