@@ -103,20 +103,22 @@ class MainWindow(QMainWindow):
             slots_per_day=options.slots_per_day,
             hall_capacity_file=options.hall_capacity_file,
             hall_config=options.hall_config,
+            optimizer=options.optimizer,
             num_tries=options.num_tries,
             random_seed=options.random_seed,
             n=options.n,
+            iterations=options.iterations,
+            initial_temperature=options.initial_temperature,
+            cooling_rate=options.cooling_rate,
         )
 
-        self.state.last_settings["num_tries"] = options.num_tries
         self.controller.run_schedule(request)
 
     def _on_schedule_started(self) -> None:
         self.state.is_running = True
         self.run_button.setEnabled(False)
-        num_tries = int(self.state.last_settings.get("num_tries", 1) or 1)
         self.progress_bar.setVisible(True)
-        self.progress_bar.setRange(0, max(1, num_tries))
+        self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
         self.status_label.setText("Scheduling in progress...")
 

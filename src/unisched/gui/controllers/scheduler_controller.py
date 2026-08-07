@@ -7,8 +7,9 @@ from dataclasses import dataclass
 from PySide6.QtCore import QThread, QObject, Signal
 
 from unisched import schedule
-from unisched.core import GraphColoringOptimizer, SchedulingCoordinator
+from unisched.core import GraphColoringOptimizer, SchedulingCoordinator, SimulatedAnnealingOptimizer
 from unisched.domain.models import Schedule
+from unisched.gui.constants import OPTIMIZER_GRAPH_COLORING, OPTIMIZER_SIMULATED_ANNEALING
 from unisched.io.loader import HallDataConfig, RegDataConfig
 
 
@@ -20,11 +21,15 @@ class ScheduleRequest:
     reg_config: RegDataConfig
     max_days: int | None
     slots_per_day: int
+    optimizer: str
     hall_capacity_file: str | None = None
     hall_config: HallDataConfig | None = None
     num_tries: int = 32
     random_seed: int = 0
     n: int = 4
+    iterations: int = 50000
+    initial_temperature: float = 10.0
+    cooling_rate: float = 0.9998
 
 
 class _ScheduleWorker(QThread):
@@ -37,26 +42,43 @@ class _ScheduleWorker(QThread):
     def __init__(self, request: ScheduleRequest, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self.request = request
+        self._total_steps = 1
+        self._last_emitted = -1
 
     def run(self) -> None:
         try:
-            optimizer = GraphColoringOptimizer(
-                num_tries=self.request.num_tries,
-                random_seed=self.request.random_seed,
-                n=self.request.n,
-                iteration_callback=self._on_iteration_completed,
-            )
+            request = self.request
+            if request.optimizer == OPTIMIZER_SIMULATED_ANNEALING:
+                optimizer = SimulatedAnnealingOptimizer(
+                    iterations=request.iterations,
+                    initial_temperature=request.initial_temperature,
+                    cooling_rate=request.cooling_rate,
+                    random_seed=request.random_seed,
+                    iteration_callback=self._on_iteration_completed,
+                )
+                self._total_steps = request.iterations
+            elif request.optimizer == OPTIMIZER_GRAPH_COLORING:
+                optimizer = GraphColoringOptimizer(
+                    num_tries=request.num_tries,
+                    random_seed=request.random_seed,
+                    n=request.n,
+                    iteration_callback=self._on_iteration_completed,
+                )
+                self._total_steps = request.num_tries
+            else:
+                raise ValueError(f"Unsupported optimizer: {request.optimizer}")
+
             coordinator = SchedulingCoordinator(
                 optimizer=optimizer,
-                slots_per_day=self.request.slots_per_day,
-                max_days=self.request.max_days,
+                slots_per_day=request.slots_per_day,
+                max_days=request.max_days,
             )
 
             result = schedule(
-                self.request.input_file,
-                reg_config=self.request.reg_config,
-                hall_capacity_file=self.request.hall_capacity_file,
-                hall_config=self.request.hall_config,
+                request.input_file,
+                reg_config=request.reg_config,
+                hall_capacity_file=request.hall_capacity_file,
+                hall_config=request.hall_config,
                 coordinator=coordinator,
             )
             self.schedule_ready.emit(result)
@@ -64,7 +86,11 @@ class _ScheduleWorker(QThread):
             self.schedule_failed.emit(str(exc))
 
     def _on_iteration_completed(self, current_iteration: int) -> None:
-        self.progress_updated.emit(current_iteration, self.request.num_tries)
+        total = self._total_steps
+        step = max(1, total // 100)
+        if current_iteration - self._last_emitted >= step or current_iteration >= total:
+            self._last_emitted = current_iteration
+            self.progress_updated.emit(current_iteration, total)
 
 
 class SchedulerController(QObject):

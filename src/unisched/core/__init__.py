@@ -31,10 +31,11 @@ Planned main classes:
 """
 
 from .coordinator import SchedulingCoordinator
-from .optimizers import BaseOptimizer, GraphColoringOptimizer
+from .optimizers import BaseOptimizer, GraphColoringOptimizer, SimulatedAnnealingOptimizer
 
 __all__ = [
     "BaseOptimizer",
     "GraphColoringOptimizer",
+    "SimulatedAnnealingOptimizer",
     "SchedulingCoordinator",
 ]
