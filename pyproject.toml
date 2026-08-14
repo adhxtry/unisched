@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "unisched"
-version = "0.1.1"
+version = "0.2.0"
 description = "An exam scheduler application built with Python, designed to optimize exam schedules at university level."
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
