@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QStandardPaths, Qt
 from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QSizePolicy,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -50,6 +51,7 @@ class MainWindow(QMainWindow):
         self.theme_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
 
         self.run_button = QPushButton("Generate Schedule")
+        self.run_button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         self.run_button.setToolTip(
             "Click to run the optimizer and generate a conflict-free exam timetable."
         )
@@ -57,6 +59,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
+        self.progress_bar.setMinimumWidth(300)
         self.progress_bar.setToolTip("Optimization progress across attempts / iterations.")
         self.status_label = QLabel("Ready")
         self.status_label.setToolTip(
@@ -95,10 +98,10 @@ class MainWindow(QMainWindow):
         self.tabs.setTabToolTip(
             1, "View the generated exam schedule, penalty summary, and export results."
         )
+        self.tabs.setCornerWidget(self.theme_button, Qt.Corner.TopRightCorner)
         root_layout.addWidget(self.tabs, 1)
 
         action_row = QHBoxLayout()
-        action_row.addWidget(self.theme_button)
         action_row.addWidget(self.progress_bar)
         action_row.addStretch(1)
         action_row.addWidget(self.status_label)
@@ -200,6 +203,7 @@ class MainWindow(QMainWindow):
     def _toggle_theme(self) -> None:
         self.current_theme = THEME_DARK if self.current_theme == THEME_LIGHT else THEME_LIGHT
         self._apply_current_theme()
+        self._save_ui_state()
 
     def _apply_current_theme(self) -> None:
         apply_theme(self, self.current_theme)

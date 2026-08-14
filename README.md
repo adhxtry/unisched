@@ -71,14 +71,14 @@ Constructs conflict-free exam timetables using an enhanced **DSatur (Degree of S
 - **Objective-Aware Slot Selection**: Scores candidate slots by soft same-day penalty impact, room fit, and least constraining value (LCV).
 - **Kempe-Chain Local Repair**: Resolves tight coloring bottlenecks by recoloring conflicting neighbors.
 - **GRASP Local Descent**: Fine-tunes completed colorings with non-destructive two-slot hall reallocation sweeps to drive soft penalties down.
-- **Parallel Multi-threading**: Runs repeated stochastic attempts across `n` worker threads.
+- **Parallel Multi-Processing**: Runs batch chunked attempts across `n` worker processes, bypassing Python's GIL for true multi-core speedup.
 
 ```python
 from unisched.core import GraphColoringOptimizer, SchedulingCoordinator
 
 coordinator = SchedulingCoordinator(
     optimizer=GraphColoringOptimizer(
-        num_tries=64,
+        num_tries=128,
         random_seed=42,
         n=4,
     ),
@@ -93,14 +93,14 @@ An iterative metaheuristic local search optimizer designed to heavily optimize s
 - Explores neighbor states via fast single-course perturbations.
 - Computes $O(\text{degree})$ incremental penalty deltas with exponential cooling.
 - Efficiently verifies hall feasibility on affected slots only.
-- **Parallel Multi-threading**: Runs independent Markov chains across `n` worker threads with distinct random trajectories.
+- **Parallel Multi-Processing**: Runs independent Markov chains across `n` worker processes with distinct random trajectories, achieving true multi-core scaling.
 
 ```python
 from unisched.core import SimulatedAnnealingOptimizer, SchedulingCoordinator
 
 coordinator = SchedulingCoordinator(
     optimizer=SimulatedAnnealingOptimizer(
-        iterations=50_000,
+        iterations=200_000,
         initial_temperature=10.0,
         cooling_rate=0.9998,
         random_seed=42,

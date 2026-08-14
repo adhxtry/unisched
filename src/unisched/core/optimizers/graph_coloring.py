@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import random
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Callable, Iterator
 
@@ -498,6 +497,108 @@ def optimize_graph_coloring(
     if not courses:
         return Schedule()
 
+
+def _run_graph_coloring_attempt(
+    attempt: int,
+    graph: ConflictGraph,
+    num_slots: int,
+    enrollments: dict[str, int],
+    grouped_halls_template: GroupedHalls | None,
+    slot_days: list[int],
+    random_seed: int,
+    courses: list[Course],
+    time_slots: list[TimeSlot],
+    conflicts: dict[str, set[str]],
+) -> tuple[int, Schedule | None]:
+    rng = random.Random(random_seed + attempt)
+    hall_inventory_by_slot = (
+        build_slot_hall_inventory(num_slots, grouped_halls_template)
+        if grouped_halls_template is not None
+        else None
+    )
+    coloring = _color_once(
+        graph,
+        num_slots,
+        enrollments,
+        rng,
+        hall_inventory_by_slot,
+        randomize=attempt > 0,
+        slot_days=slot_days,
+        enable_repair=True,
+    )
+    if coloring is not None:
+        refined_color_map, refined_hall_map = _local_descent(
+            coloring.color_map,
+            coloring.hall_map,
+            graph,
+            num_slots,
+            enrollments,
+            grouped_halls_template,
+            slot_days,
+        )
+        schedule = _build_schedule(
+            courses,
+            time_slots,
+            refined_color_map,
+            refined_hall_map,
+            precomputed_conflicts=conflicts,
+        )
+        return attempt, schedule
+
+    return attempt, None
+
+
+def _run_graph_coloring_chunk(
+    attempts: list[int],
+    graph: ConflictGraph,
+    num_slots: int,
+    enrollments: dict[str, int],
+    grouped_halls_template: GroupedHalls | None,
+    slot_days: list[int],
+    random_seed: int,
+    courses: list[Course],
+    time_slots: list[TimeSlot],
+    conflicts: dict[str, set[str]],
+) -> list[tuple[int, Schedule | None]]:
+    results: list[tuple[int, Schedule | None]] = []
+    for attempt in attempts:
+        results.append(
+            _run_graph_coloring_attempt(
+                attempt,
+                graph,
+                num_slots,
+                enrollments,
+                grouped_halls_template,
+                slot_days,
+                random_seed,
+                courses,
+                time_slots,
+                conflicts,
+            )
+        )
+    return results
+
+
+def optimize_graph_coloring(
+    courses: list[Course],
+    time_slots: list[TimeSlot],
+    *,
+    halls: list[ExamHall] | None = None,
+    num_tries: int = 128,
+    random_seed: int = 0,
+    n: int = 1,
+    iteration_callback: Callable[[int], None] | None = None,
+) -> Schedule:
+    """Schedule exams across time slots and halls using multi-try DSatur coloring."""
+    if not time_slots:
+        raise ValueError("time_slots must not be empty")
+    if num_tries < 1:
+        raise ValueError("num_tries must be >= 1")
+    if n < 1:
+        raise ValueError("n must be >= 1")
+    if not courses:
+        return Schedule()
+
     graph = build_conflict_graph(courses)
     enrollments = {course.code: len(course.students) for course in courses}
     grouped_halls_template = build_grouped_halls(halls or []) if halls is not None else None
@@ -507,64 +608,70 @@ def optimize_graph_coloring(
     best_schedule: Schedule | None = None
     best_score: tuple[int, int, int] | None = None
 
-    def run_attempt(attempt: int) -> tuple[int, ColoringResult | None]:
-        rng = random.Random(random_seed + attempt)
-        hall_inventory_by_slot = (
-            build_slot_hall_inventory(len(time_slots), grouped_halls_template)
-            if grouped_halls_template is not None
-            else None
-        )
-        coloring = _color_once(
-            graph,
-            len(time_slots),
-            enrollments,
-            rng,
-            hall_inventory_by_slot,
-            randomize=attempt > 0,
-            slot_days=slot_days,
-            enable_repair=True,
-        )
-        if coloring is not None:
-            refined_color_map, refined_hall_map = _local_descent(
-                coloring.color_map,
-                coloring.hall_map,
+    if n == 1 or num_tries == 1:
+        for attempt in range(num_tries):
+            _, schedule = _run_graph_coloring_attempt(
+                attempt,
                 graph,
                 len(time_slots),
                 enrollments,
                 grouped_halls_template,
                 slot_days,
+                random_seed,
+                courses,
+                time_slots,
+                conflicts,
             )
-            coloring = ColoringResult(color_map=refined_color_map, hall_map=refined_hall_map)
-
-        return attempt, coloring
-
-    with ThreadPoolExecutor(max_workers=min(n, num_tries)) as executor:
-        future_to_attempt = {
-            executor.submit(run_attempt, attempt): attempt for attempt in range(num_tries)
-        }
-
-        for future in as_completed(future_to_attempt):
-            attempt, coloring = future.result()
-
             if iteration_callback is not None:
                 iteration_callback(attempt + 1)
 
-            if coloring is None:
-                continue
+            if schedule is not None:
+                used_slots = len({event.time_slot for event in schedule.events})
+                score = (len(schedule.unscheduled_courses), schedule.penalty, used_slots)
+                if best_score is None or score < best_score:
+                    best_score = score
+                    best_schedule = schedule
+    else:
+        from concurrent.futures import ProcessPoolExecutor, as_completed
 
-            schedule = _build_schedule(
-                courses,
-                time_slots,
-                coloring.color_map,
-                coloring.hall_map,
-                precomputed_conflicts=conflicts,
-            )
-            used_slots = len({event.time_slot for event in schedule.events})
-            score = (len(schedule.unscheduled_courses), schedule.penalty, used_slots)
+        chunk_size = max(1, num_tries // (n * 4))
+        chunks = [
+            list(range(i, min(i + chunk_size, num_tries))) for i in range(0, num_tries, chunk_size)
+        ]
 
-            if best_score is None or score < best_score:
-                best_score = score
-                best_schedule = schedule
+        completed_attempts = 0
+        with ProcessPoolExecutor(max_workers=min(n, len(chunks))) as executor:
+            futures = [
+                executor.submit(
+                    _run_graph_coloring_chunk,
+                    chunk,
+                    graph,
+                    len(time_slots),
+                    enrollments,
+                    grouped_halls_template,
+                    slot_days,
+                    random_seed,
+                    courses,
+                    time_slots,
+                    conflicts,
+                )
+                for chunk in chunks
+            ]
+
+            for future in as_completed(futures):
+                chunk_results = future.result()
+                completed_attempts += len(chunk_results)
+                if iteration_callback is not None:
+                    iteration_callback(completed_attempts)
+
+                for attempt, schedule in chunk_results:
+                    if schedule is None:
+                        continue
+                    used_slots = len({event.time_slot for event in schedule.events})
+                    score = (len(schedule.unscheduled_courses), schedule.penalty, used_slots)
+                    if best_score is None or score < best_score:
+                        best_score = score
+                        best_schedule = schedule
 
     if best_schedule is not None and best_schedule.is_complete:
         return best_schedule
@@ -577,7 +684,7 @@ class GraphColoringOptimizer(BaseOptimizer):
 
     def __init__(
         self,
-        num_tries: int = 32,
+        num_tries: int = 128,
         random_seed: int = 0,
         n: int = 4,
         iteration_callback: Callable[[int], None] | None = None,

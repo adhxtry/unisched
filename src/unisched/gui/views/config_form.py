@@ -246,7 +246,7 @@ class ConfigFormWidget(QWidget):
         )
         self.num_tries_input = QSpinBox()
         self.num_tries_input.setRange(1, 100000)
-        self.num_tries_input.setValue(32)
+        self.num_tries_input.setValue(128)
         self.num_tries_input.setToolTip(num_tries_tip)
 
         graph_coloring_layout.addRow(
@@ -257,10 +257,10 @@ class ConfigFormWidget(QWidget):
         annealing_layout = QFormLayout(self.annealing_params)
         annealing_layout.setContentsMargins(0, 0, 0, 0)
 
-        iterations_tip = "Number of move evaluation iterations (e.g. 50,000). Higher values explore more schedule permutations."
+        iterations_tip = "Number of move evaluation iterations (e.g. 200,000). Higher values explore more schedule permutations."
         self.iterations_input = QSpinBox()
         self.iterations_input.setRange(1, 10000000)
-        self.iterations_input.setValue(50000)
+        self.iterations_input.setValue(200000)
         self.iterations_input.setToolTip(iterations_tip)
 
         temp_tip = "Initial search temperature (e.g. 10.0). Higher values allow exploring suboptimal moves early on to escape local traps."

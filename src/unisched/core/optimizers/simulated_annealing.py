@@ -169,12 +169,44 @@ def _run_single_annealing(
     return _schedule_from_state(courses, time_slots, best_state, halls)
 
 
+def _run_single_annealing_worker(
+    worker_index: int,
+    courses: list[Course],
+    time_slots: list[TimeSlot],
+    graph: ConflictGraph,
+    enrollments: dict[str, int],
+    grouped: GroupedHalls | None,
+    conflicts: dict[str, set[str]],
+    iterations: int,
+    initial_temperature: float,
+    cooling_rate: float,
+    seed_base: int,
+    halls: list[ExamHall] | None,
+) -> Schedule:
+    return _run_single_annealing(
+        worker_index,
+        courses,
+        time_slots,
+        graph,
+        enrollments,
+        grouped,
+        conflicts,
+        iterations,
+        initial_temperature,
+        cooling_rate,
+        seed_base,
+        halls,
+        None,
+        False,
+    )
+
+
 def optimize_simulated_annealing(
     courses: list[Course],
     time_slots: list[TimeSlot],
     *,
     halls: list[ExamHall] | None = None,
-    iterations: int = 50_000,
+    iterations: int = 200_000,
     initial_temperature: float = 10.0,
     cooling_rate: float = 0.9998,
     random_seed: int = 0,
@@ -219,13 +251,13 @@ def optimize_simulated_annealing(
             track_callback=True,
         )
 
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from concurrent.futures import ProcessPoolExecutor, as_completed
 
     schedules: list[Schedule] = []
-    with ThreadPoolExecutor(max_workers=n) as executor:
+    with ProcessPoolExecutor(max_workers=n) as executor:
         futures = [
             executor.submit(
-                _run_single_annealing,
+                _run_single_annealing_worker,
                 worker_idx,
                 sorted_courses,
                 time_slots,
@@ -238,14 +270,16 @@ def optimize_simulated_annealing(
                 cooling_rate,
                 random_seed,
                 halls,
-                iteration_callback,
-                worker_idx == 0,
             )
             for worker_idx in range(n)
         ]
 
+        completed = 0
         for future in as_completed(futures):
             schedules.append(future.result())
+            completed += 1
+            if iteration_callback is not None:
+                iteration_callback(int((completed / n) * iterations))
 
     best_schedule = min(
         schedules,
@@ -259,7 +293,7 @@ class SimulatedAnnealingOptimizer(BaseOptimizer):
 
     def __init__(
         self,
-        iterations: int = 50_000,
+        iterations: int = 200_000,
         initial_temperature: float = 10.0,
         cooling_rate: float = 0.9998,
         random_seed: int = 0,

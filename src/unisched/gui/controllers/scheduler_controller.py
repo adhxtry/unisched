@@ -24,10 +24,10 @@ class ScheduleRequest:
     optimizer: str
     hall_capacity_file: str | None = None
     hall_config: HallDataConfig | None = None
-    num_tries: int = 32
+    num_tries: int = 128
     random_seed: int = 0
     n: int = 4
-    iterations: int = 50000
+    iterations: int = 200000
     initial_temperature: float = 10.0
     cooling_rate: float = 0.9998
 
