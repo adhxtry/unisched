@@ -103,4 +103,3 @@ def assign_halls_for_enrollment(
     group_index, remaining_halls, assigned_halls = solution
     grouped_halls[group_index] = remaining_halls
     return assigned_halls
-
