@@ -93,3 +93,24 @@ def test_optimizer_callback_and_validation() -> None:
     assert seen == [1, 2, 3, 4]
     with pytest.raises(ValueError, match="iterations"):
         optimize_simulated_annealing(_courses(), [TimeSlot(day=1, slot_index=1)], iterations=0)
+
+
+def test_annealing_parallel_execution() -> None:
+    slots = [TimeSlot(day=day, slot_index=slot) for day in range(1, 3) for slot in (1, 2)]
+
+    optimizer = SimulatedAnnealingOptimizer(iterations=500, random_seed=42, n=4)
+    schedule = optimizer.optimize(_courses(), slots)
+
+    assert schedule.is_complete
+    assignments = schedule.assignment_map()
+    assert assignments["A"] != assignments["B"]
+    assert assignments["A"] != assignments["C"]
+
+
+def test_annealing_rejects_invalid_parallel_worker_count() -> None:
+    with pytest.raises(ValueError, match="n must be >= 1"):
+        optimize_simulated_annealing(
+            _courses(),
+            [TimeSlot(day=1, slot_index=1)],
+            n=0,
+        )

@@ -93,6 +93,7 @@ An iterative metaheuristic local search optimizer designed to heavily optimize s
 - Explores neighbor states via fast single-course perturbations.
 - Computes $O(\text{degree})$ incremental penalty deltas with exponential cooling.
 - Efficiently verifies hall feasibility on affected slots only.
+- **Parallel Multi-threading**: Runs independent Markov chains across `n` worker threads with distinct random trajectories.
 
 ```python
 from unisched.core import SimulatedAnnealingOptimizer, SchedulingCoordinator
@@ -103,6 +104,7 @@ coordinator = SchedulingCoordinator(
         initial_temperature=10.0,
         cooling_rate=0.9998,
         random_seed=42,
+        n=4,
     ),
     slots_per_day=2,
     max_days=8,

@@ -54,6 +54,7 @@ class _ScheduleWorker(QThread):
                     initial_temperature=request.initial_temperature,
                     cooling_rate=request.cooling_rate,
                     random_seed=request.random_seed,
+                    n=request.n,
                     iteration_callback=self._on_iteration_completed,
                 )
                 self._total_steps = request.iterations
@@ -67,7 +68,6 @@ class _ScheduleWorker(QThread):
                 self._total_steps = request.num_tries
             else:
                 raise ValueError(f"Unsupported optimizer: {request.optimizer}")
-
             coordinator = SchedulingCoordinator(
                 optimizer=optimizer,
                 slots_per_day=request.slots_per_day,

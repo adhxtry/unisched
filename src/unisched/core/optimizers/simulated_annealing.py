@@ -80,33 +80,23 @@ def _hall_state_is_feasible(
     return True
 
 
-def optimize_simulated_annealing(
+def _run_single_annealing(
+    worker_index: int,
     courses: list[Course],
     time_slots: list[TimeSlot],
-    *,
-    halls: list[ExamHall] | None = None,
-    iterations: int = 50_000,
-    initial_temperature: float = 10.0,
-    cooling_rate: float = 0.9998,
-    random_seed: int = 0,
-    iteration_callback: Callable[[int], None] | None = None,
+    graph: ConflictGraph,
+    enrollments: dict[str, int],
+    grouped: GroupedHalls | None,
+    conflicts: list,
+    iterations: int,
+    initial_temperature: float,
+    cooling_rate: float,
+    seed_base: int,
+    halls: list[ExamHall] | None,
+    iteration_callback: Callable[[int], None] | None,
+    track_callback: bool,
 ) -> Schedule:
-    """Improve a feasible DSatur schedule using incremental penalty deltas."""
-    if not time_slots:
-        raise ValueError("time_slots must not be empty")
-    if iterations < 1:
-        raise ValueError("iterations must be >= 1")
-    if initial_temperature <= 0:
-        raise ValueError("initial_temperature must be > 0")
-    if not 0 < cooling_rate < 1:
-        raise ValueError("cooling_rate must be between 0 and 1")
-    if not courses:
-        return Schedule()
-
-    courses = sorted(courses, key=lambda course: course.code)
-    graph = build_conflict_graph(courses)
-    enrollments = {course.code: len(course.students) for course in courses}
-    grouped = build_grouped_halls(halls or []) if halls is not None else None
+    slot_days = [ts.day for ts in time_slots]
     seed = None
     for attempt in range(32):
         inventory = (
@@ -116,25 +106,26 @@ def optimize_simulated_annealing(
             graph,
             len(time_slots),
             enrollments,
-            random.Random(random_seed + attempt),
+            random.Random(seed_base + worker_index * 1000 + attempt),
             inventory,
-            randomize=attempt > 0,
+            randomize=attempt > 0 or worker_index > 0,
+            slot_days=slot_days,
         )
         if seed is not None:
             break
+
     if seed is None:
         return Schedule(unscheduled_courses=sorted(course.code for course in courses))
 
     positions = {course.code: index for index, course in enumerate(courses)}
     state = [seed.color_map[course.code] for course in courses]
-    conflicts = compute_student_conflicts(courses)
     current_penalty = calculate_penalty(
         {course.code: time_slots[state[index]] for index, course in enumerate(courses)},
         conflicts,
     )
     best_state = state[:]
     best_penalty = current_penalty
-    rng = random.Random(random_seed + 1)
+    rng = random.Random(seed_base + worker_index * 1000 + 1)
     temperature = initial_temperature
     neighbors = [
         [(positions[neighbor], weight) for neighbor, weight in graph[course.code].items()]
@@ -171,10 +162,96 @@ def optimize_simulated_annealing(
                         best_state = state[:]
 
             temperature = max(temperature * cooling_rate, 1e-12)
-        if iteration_callback is not None:
+
+        if track_callback and iteration_callback is not None:
             iteration_callback(iteration + 1)
 
     return _schedule_from_state(courses, time_slots, best_state, halls)
+
+
+def optimize_simulated_annealing(
+    courses: list[Course],
+    time_slots: list[TimeSlot],
+    *,
+    halls: list[ExamHall] | None = None,
+    iterations: int = 50_000,
+    initial_temperature: float = 10.0,
+    cooling_rate: float = 0.9998,
+    random_seed: int = 0,
+    n: int = 1,
+    iteration_callback: Callable[[int], None] | None = None,
+) -> Schedule:
+    """Improve feasible DSatur schedules using parallel simulated annealing chains."""
+    if not time_slots:
+        raise ValueError("time_slots must not be empty")
+    if iterations < 1:
+        raise ValueError("iterations must be >= 1")
+    if initial_temperature <= 0:
+        raise ValueError("initial_temperature must be > 0")
+    if not 0 < cooling_rate < 1:
+        raise ValueError("cooling_rate must be between 0 and 1")
+    if n < 1:
+        raise ValueError("n must be >= 1")
+    if not courses:
+        return Schedule()
+
+    sorted_courses = sorted(courses, key=lambda course: course.code)
+    graph = build_conflict_graph(sorted_courses)
+    enrollments = {course.code: len(course.students) for course in sorted_courses}
+    grouped = build_grouped_halls(halls or []) if halls is not None else None
+    conflicts = compute_student_conflicts(sorted_courses)
+
+    if n == 1:
+        return _run_single_annealing(
+            0,
+            sorted_courses,
+            time_slots,
+            graph,
+            enrollments,
+            grouped,
+            conflicts,
+            iterations,
+            initial_temperature,
+            cooling_rate,
+            random_seed,
+            halls,
+            iteration_callback,
+            track_callback=True,
+        )
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    schedules: list[Schedule] = []
+    with ThreadPoolExecutor(max_workers=n) as executor:
+        futures = [
+            executor.submit(
+                _run_single_annealing,
+                worker_idx,
+                sorted_courses,
+                time_slots,
+                graph,
+                enrollments,
+                grouped,
+                conflicts,
+                iterations,
+                initial_temperature,
+                cooling_rate,
+                random_seed,
+                halls,
+                iteration_callback,
+                worker_idx == 0,
+            )
+            for worker_idx in range(n)
+        ]
+
+        for future in as_completed(futures):
+            schedules.append(future.result())
+
+    best_schedule = min(
+        schedules,
+        key=lambda s: (len(s.unscheduled_courses), s.penalty),
+    )
+    return best_schedule
 
 
 class SimulatedAnnealingOptimizer(BaseOptimizer):
@@ -186,12 +263,14 @@ class SimulatedAnnealingOptimizer(BaseOptimizer):
         initial_temperature: float = 10.0,
         cooling_rate: float = 0.9998,
         random_seed: int = 0,
+        n: int = 1,
         iteration_callback: Callable[[int], None] | None = None,
     ) -> None:
         self.iterations = iterations
         self.initial_temperature = initial_temperature
         self.cooling_rate = cooling_rate
         self.random_seed = random_seed
+        self.n = n
         self.iteration_callback = iteration_callback
 
     def optimize(
@@ -209,5 +288,6 @@ class SimulatedAnnealingOptimizer(BaseOptimizer):
             initial_temperature=self.initial_temperature,
             cooling_rate=self.cooling_rate,
             random_seed=self.random_seed,
+            n=self.n,
             iteration_callback=self.iteration_callback,
         )
