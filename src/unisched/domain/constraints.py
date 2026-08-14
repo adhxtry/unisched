@@ -21,21 +21,33 @@ class ConflictModel:
 def compute_student_conflicts(courses: Iterable[Course]) -> list[ConflictModel]:
     """Build pairwise conflicts for courses sharing one or more students."""
 
-    result: list[ConflictModel] = []
-    sorted_courses = sorted(courses, key=lambda course: course.code)
+    courses_list = list(courses)
+    student_to_courses: dict[str, list[str]] = {}
+    for course in courses_list:
+        for student in course.students:
+            student_to_courses.setdefault(student, []).append(course.code)
 
-    for course_a, course_b in combinations(sorted_courses, 2):
-        overlap = len(course_a.students & course_b.students)
-        if overlap > 0:
-            result.append(
-                ConflictModel(
-                    course_a=course_a.code,
-                    course_b=course_b.code,
-                    shared_students=overlap,
-                )
-            )
+    pair_counts: dict[tuple[str, str], int] = {}
+    for enrolled in student_to_courses.values():
+        if len(enrolled) < 2:
+            continue
+        for i in range(len(enrolled)):
+            c1 = enrolled[i]
+            for j in range(i + 1, len(enrolled)):
+                c2 = enrolled[j]
+                if c1 == c2:
+                    continue
+                pair = (c1, c2) if c1 < c2 else (c2, c1)
+                pair_counts[pair] = pair_counts.get(pair, 0) + 1
 
-    return result
+    return [
+        ConflictModel(
+            course_a=c1,
+            course_b=c2,
+            shared_students=count,
+        )
+        for (c1, c2), count in sorted(pair_counts.items())
+    ]
 
 
 def calculate_penalty(

@@ -102,3 +102,51 @@ def test_optimize_graph_coloring_rejects_invalid_parallel_worker_count() -> None
 
     with pytest.raises(ValueError, match="n must be >= 1"):
         optimize_graph_coloring(courses, time_slots, n=0)
+
+
+def test_optimize_graph_coloring_minimizes_same_day_penalty() -> None:
+    # Courses A and B conflict (share students). Two days available.
+    # Day 1 Slot 1, Day 1 Slot 2, Day 2 Slot 1, Day 2 Slot 2.
+    # Placing A and B on different days results in penalty 0 vs same day penalty > 0.
+    courses = [
+        Course(code="A", students=frozenset({"s1", "s2"})),
+        Course(code="B", students=frozenset({"s1", "s2"})),
+        Course(code="C", students=frozenset({"s3"})),
+    ]
+    time_slots = [
+        TimeSlot(day=1, slot_index=1),
+        TimeSlot(day=1, slot_index=2),
+        TimeSlot(day=2, slot_index=1),
+        TimeSlot(day=2, slot_index=2),
+    ]
+
+    schedule = optimize_graph_coloring(courses, time_slots, num_tries=10, random_seed=42)
+
+    assert schedule.is_complete is True
+    assert schedule.penalty == 0
+    mapping = schedule.assignment_map()
+    assert mapping["A"].day != mapping["B"].day
+
+
+def test_optimize_graph_coloring_kempe_repair() -> None:
+    # Triangle graph A-B, B-C, C-A with 3 slots across 2 days.
+    courses = [
+        Course(code="A", students=frozenset({"s1"})),
+        Course(code="B", students=frozenset({"s1", "s2"})),
+        Course(code="C", students=frozenset({"s2", "s3"})),
+        Course(code="D", students=frozenset({"s3"})),
+    ]
+    time_slots = [
+        TimeSlot(day=1, slot_index=1),
+        TimeSlot(day=1, slot_index=2),
+        TimeSlot(day=2, slot_index=1),
+    ]
+
+    schedule = optimize_graph_coloring(courses, time_slots, num_tries=8, random_seed=42)
+
+    assert schedule.is_complete is True
+    mapping = schedule.assignment_map()
+    assert mapping["A"] != mapping["B"]
+    assert mapping["B"] != mapping["C"]
+    assert mapping["C"] != mapping["D"]
+

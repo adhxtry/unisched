@@ -44,14 +44,14 @@ def build_slot_hall_inventory(
     return {slot_idx: clone_grouped_halls(grouped_halls) for slot_idx in range(slot_count)}
 
 
-def assign_halls_for_enrollment(
+def preview_halls_for_enrollment(
     enrollment: int,
     grouped_halls: GroupedHalls,
-) -> tuple[ExamHall, ...] | None:
-    """Assign halls from one group with minimal excess capacity for a course."""
+) -> tuple[int, list[ExamHall], tuple[ExamHall, ...]] | None:
+    """Find the best hall assignment for an enrollment without mutating grouped_halls."""
 
     if enrollment < 1:
-        return tuple()
+        return (0, [], tuple())
 
     best_solution: tuple[int, list[ExamHall], tuple[ExamHall, ...]] | None = None
     best_score: tuple[int, int, int] | None = None
@@ -84,9 +84,23 @@ def assign_halls_for_enrollment(
                 tuple(sorted(selected_halls, key=lambda hall: hall.hall)),
             )
 
-    if best_solution is None:
+    return best_solution
+
+
+def assign_halls_for_enrollment(
+    enrollment: int,
+    grouped_halls: GroupedHalls,
+) -> tuple[ExamHall, ...] | None:
+    """Assign halls from one group with minimal excess capacity for a course."""
+
+    if enrollment < 1:
+        return tuple()
+
+    solution = preview_halls_for_enrollment(enrollment, grouped_halls)
+    if solution is None:
         return None
 
-    group_index, remaining_halls, assigned_halls = best_solution
+    group_index, remaining_halls, assigned_halls = solution
     grouped_halls[group_index] = remaining_halls
     return assigned_halls
+
