@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from PySide6.QtGui import QCloseEvent
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtCore import QStandardPaths
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
 from unisched.domain.models import Schedule
 from unisched.gui.controllers import ScheduleRequest, SchedulerController
 from unisched.gui.models import AppState
+from unisched.gui.theme import THEME_DARK, THEME_LIGHT, apply_theme
 from unisched.io import save_schedule_to_csv
 from unisched.gui.views.config_form import ConfigFormWidget
 from unisched.gui.views.results_view import ResultsViewWidget
@@ -36,6 +37,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Unisched - Exam Scheduler")
         self.resize(1000, 700)
 
+        self.current_theme = THEME_LIGHT
         self.state = AppState()
         self.controller = SchedulerController(self)
 
@@ -43,16 +45,28 @@ class MainWindow(QMainWindow):
         self.results_view = ResultsViewWidget(self)
         self.tabs = QTabWidget(self)
 
+        self.theme_button = QPushButton("🌙 Dark Theme", self)
+        self.theme_button.setToolTip("Toggle Light/Dark Theme (Ctrl+T)")
+        self.theme_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
+
         self.run_button = QPushButton("Generate Schedule")
+        self.run_button.setToolTip(
+            "Click to run the optimizer and generate a conflict-free exam timetable."
+        )
         self.progress_bar = QProgressBar(self)
         self.progress_bar.setVisible(False)
         self.progress_bar.setRange(0, 1)
         self.progress_bar.setValue(0)
+        self.progress_bar.setToolTip("Optimization progress across attempts / iterations.")
         self.status_label = QLabel("Ready")
+        self.status_label.setToolTip(
+            "Current system state (Ready, In Progress, Complete, or Error)."
+        )
 
         self._setup_layout()
         self._connect_signals()
         self._load_ui_state()
+        self._apply_current_theme()
 
     def _setup_layout(self) -> None:
         central_widget = QWidget(self)
@@ -61,19 +75,30 @@ class MainWindow(QMainWindow):
         root_layout = QVBoxLayout(central_widget)
 
         configuration_tab = QWidget(self)
+        configuration_tab.setToolTip("Configure files, column mappings, and scheduling parameters.")
         configuration_layout = QVBoxLayout(configuration_tab)
         configuration_layout.addWidget(self.config_form)
         configuration_layout.addStretch(1)
 
         schedule_tab = QWidget(self)
+        schedule_tab.setToolTip(
+            "View generated exam schedule, summary metrics, and room assignments."
+        )
         schedule_layout = QVBoxLayout(schedule_tab)
         schedule_layout.addWidget(self.results_view)
 
         self.tabs.addTab(configuration_tab, "Configuration")
         self.tabs.addTab(schedule_tab, "Schedule")
+        self.tabs.setTabToolTip(
+            0, "Configure input files, column mappings, room settings, and algorithm parameters."
+        )
+        self.tabs.setTabToolTip(
+            1, "View the generated exam schedule, penalty summary, and export results."
+        )
         root_layout.addWidget(self.tabs, 1)
 
         action_row = QHBoxLayout()
+        action_row.addWidget(self.theme_button)
         action_row.addWidget(self.progress_bar)
         action_row.addStretch(1)
         action_row.addWidget(self.status_label)
@@ -81,6 +106,8 @@ class MainWindow(QMainWindow):
         root_layout.addLayout(action_row)
 
     def _connect_signals(self) -> None:
+        self.theme_button.clicked.connect(self._toggle_theme)
+        self.theme_shortcut.activated.connect(self._toggle_theme)
         self.run_button.clicked.connect(self._on_run_clicked)
         self.results_view.export_requested.connect(self._on_export_requested)
 
@@ -170,6 +197,19 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001 - GUI should surface failures
             QMessageBox.critical(self, "Export Failed", str(exc))
 
+    def _toggle_theme(self) -> None:
+        self.current_theme = THEME_DARK if self.current_theme == THEME_LIGHT else THEME_LIGHT
+        self._apply_current_theme()
+
+    def _apply_current_theme(self) -> None:
+        apply_theme(self, self.current_theme)
+        if self.current_theme == THEME_DARK:
+            self.theme_button.setText("☀️ Light Theme")
+            self.theme_button.setToolTip("Switch to Light Theme (Ctrl+T)")
+        else:
+            self.theme_button.setText("🌙 Dark Theme")
+            self.theme_button.setToolTip("Switch to Dark Theme (Ctrl+T)")
+
     def _ui_state_path(self) -> Path:
         base_dir = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
         if not base_dir:
@@ -189,6 +229,10 @@ class MainWindow(QMainWindow):
         except (OSError, ValueError):
             return
 
+        saved_theme = state_payload.get("theme")
+        if saved_theme in (THEME_LIGHT, THEME_DARK):
+            self.current_theme = saved_theme
+
         config_state = state_payload.get("config_form", {})
         if isinstance(config_state, dict):
             self.config_form.apply_ui_state(config_state)
@@ -199,6 +243,7 @@ class MainWindow(QMainWindow):
 
     def _save_ui_state(self) -> None:
         state_payload = {
+            "theme": self.current_theme,
             "active_tab": self.tabs.currentIndex(),
             "config_form": self.config_form.get_ui_state(),
         }

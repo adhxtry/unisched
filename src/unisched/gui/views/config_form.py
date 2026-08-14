@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QPushButton,
     QSpinBox,
@@ -47,6 +48,27 @@ class SchedulingOptions:
     cooling_rate: float
 
 
+def _make_field_label(text: str, tooltip: str, parent: QWidget) -> QWidget:
+    """Create a form label paired with an info badge and informative tooltip."""
+    container = QWidget(parent)
+    layout = QHBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.setSpacing(4)
+
+    lbl = QLabel(text, container)
+    lbl.setToolTip(tooltip)
+
+    info_icon = QLabel("ℹ️", container)
+    info_icon.setStyleSheet("color: #666; font-size: 11px;")
+    info_icon.setToolTip(tooltip)
+
+    layout.addWidget(lbl)
+    layout.addWidget(info_icon)
+    layout.addStretch(0)
+    container.setToolTip(tooltip)
+    return container
+
+
 class ConfigFormWidget(QWidget):
     """Provide inputs for data column mapping and scheduler options."""
 
@@ -59,6 +81,7 @@ class ConfigFormWidget(QWidget):
         layout = QVBoxLayout(self)
 
         registration_group = QGroupBox("Registration Configuration", self)
+        registration_group.setToolTip("Settings for loading student course enrollment records.")
         registration_layout = QFormLayout(registration_group)
 
         self.student_col_combo = QComboBox(self)
@@ -68,35 +91,72 @@ class ConfigFormWidget(QWidget):
         self.course_col_combo.setEnabled(False)
         self.sheet_name_combo.setEnabled(False)
 
+        reg_file_tip = (
+            "Select your student course registration spreadsheet (.csv, .xlsx, .xls, .ods).\n"
+            "This file must contain which students are enrolled in which courses so Unisched can prevent exam clashes."
+        )
         self.registration_file_input = QLineEdit("")
         self.registration_file_input.setReadOnly(True)
         self.registration_file_input.setPlaceholderText("Choose CSV/Excel/ODS file")
+        self.registration_file_input.setToolTip(reg_file_tip)
+
         registration_file_row = QWidget(self)
         registration_file_layout = QHBoxLayout(registration_file_row)
         registration_file_layout.setContentsMargins(0, 0, 0, 0)
         registration_file_layout.addWidget(self.registration_file_input)
 
         browse_registration_button = QPushButton("Browse", self)
+        browse_registration_button.setToolTip(
+            "Click to browse and open a registration file from your computer."
+        )
         browse_registration_button.clicked.connect(self._browse_registration_file)
         registration_file_layout.addWidget(browse_registration_button)
 
-        registration_layout.addRow("Registration file", registration_file_row)
-        registration_layout.addRow("Sheet", self.sheet_name_combo)
-        registration_layout.addRow("Student ID column", self.student_col_combo)
-        registration_layout.addRow("Course column", self.course_col_combo)
+        sheet_tip = "Select the sheet tab within your Excel or ODS workbook that contains the student enrollment table."
+        student_tip = "Select the column header containing student roll numbers, IDs, or names (e.g. 'student_id', 'Roll No', 'Name'). Used to detect exam clashes."
+        course_tip = "Select the column header containing course codes or subjects (e.g. 'course_code', 'Subject', 'Course Title')."
+
+        self.sheet_name_combo.setToolTip(sheet_tip)
+        self.student_col_combo.setToolTip(student_tip)
+        self.course_col_combo.setToolTip(course_tip)
+
+        registration_layout.addRow(
+            _make_field_label("Registration file", reg_file_tip, self), registration_file_row
+        )
+        registration_layout.addRow(
+            _make_field_label("Sheet", sheet_tip, self), self.sheet_name_combo
+        )
+        registration_layout.addRow(
+            _make_field_label("Student ID column", student_tip, self), self.student_col_combo
+        )
+        registration_layout.addRow(
+            _make_field_label("Course column", course_tip, self), self.course_col_combo
+        )
 
         hall_group = QGroupBox("Exam Hall Configuration", self)
+        hall_group.setToolTip(
+            "Optional settings for room capacities, building groups, and hall allocation."
+        )
         hall_layout = QFormLayout(hall_group)
 
+        hall_file_tip = (
+            "Optional: Select your exam halls capacity spreadsheet (.csv, .xlsx, .xls, .ods).\n"
+            "If left empty, exams will be scheduled into time slots without room capacity limits."
+        )
         self.hall_file_input = QLineEdit("")
         self.hall_file_input.setReadOnly(True)
         self.hall_file_input.setPlaceholderText("Optional hall-capacity file")
+        self.hall_file_input.setToolTip(hall_file_tip)
+
         hall_file_row = QWidget(self)
         hall_file_layout = QHBoxLayout(hall_file_row)
         hall_file_layout.setContentsMargins(0, 0, 0, 0)
         hall_file_layout.addWidget(self.hall_file_input)
 
         browse_hall_button = QPushButton("Browse", self)
+        browse_hall_button.setToolTip(
+            "Click to browse and open a hall capacity file from your computer."
+        )
         browse_hall_button.clicked.connect(self._browse_hall_file)
         hall_file_layout.addWidget(browse_hall_button)
 
@@ -109,70 +169,137 @@ class ConfigFormWidget(QWidget):
         self.hall_group_col_combo.setEnabled(False)
         self.hall_sheet_name_combo.setEnabled(False)
 
-        hall_layout.addRow("Hall capacity file", hall_file_row)
-        hall_layout.addRow("Sheet", self.hall_sheet_name_combo)
-        hall_layout.addRow("Hall column", self.hall_col_combo)
-        hall_layout.addRow("Capacity column", self.hall_capacity_col_combo)
-        hall_layout.addRow("Group column", self.hall_group_col_combo)
+        hall_sheet_tip = "Select the sheet tab in your Excel/ODS workbook that contains room capacity and grouping data."
+        hall_col_tip = "Select the column header containing room names or numbers (e.g. 'Hall Name', 'Room', 'L-101')."
+        capacity_tip = (
+            "Select the column header containing the maximum number of students the hall can seat."
+        )
+        group_tip = (
+            "Select the column header indicating the building or zone group (e.g. '1', '2', 'Main Building').\n"
+            "Unisched ensures that all rooms assigned to a single course exam belong to the same group."
+        )
+
+        self.hall_sheet_name_combo.setToolTip(hall_sheet_tip)
+        self.hall_col_combo.setToolTip(hall_col_tip)
+        self.hall_capacity_col_combo.setToolTip(capacity_tip)
+        self.hall_group_col_combo.setToolTip(group_tip)
+
+        hall_layout.addRow(
+            _make_field_label("Hall capacity file", hall_file_tip, self), hall_file_row
+        )
+        hall_layout.addRow(
+            _make_field_label("Sheet", hall_sheet_tip, self), self.hall_sheet_name_combo
+        )
+        hall_layout.addRow(
+            _make_field_label("Hall column", hall_col_tip, self), self.hall_col_combo
+        )
+        hall_layout.addRow(
+            _make_field_label("Capacity column", capacity_tip, self), self.hall_capacity_col_combo
+        )
+        hall_layout.addRow(
+            _make_field_label("Group column", group_tip, self), self.hall_group_col_combo
+        )
 
         optimizer_group = QGroupBox("Optimizer Configuration", self)
+        optimizer_group.setToolTip(
+            "Choose and configure the optimization algorithm used to schedule exams."
+        )
         optimizer_layout = QFormLayout(optimizer_group)
 
+        optimizer_tip = (
+            "Choose the scheduling algorithm:\n"
+            "• Graph Coloring (DSatur): Fast, conflict-free timetable builder with Kempe repair and local descent.\n"
+            "• Simulated Annealing: Metaheuristic search for heavily minimizing same-day student fatigue penalties."
+        )
         self.optimizer_combo = QComboBox(self)
         self.optimizer_combo.addItem("Graph Coloring (DSatur)", OPTIMIZER_GRAPH_COLORING)
         self.optimizer_combo.addItem("Simulated Annealing", OPTIMIZER_SIMULATED_ANNEALING)
+        self.optimizer_combo.setToolTip(optimizer_tip)
 
+        slots_tip = (
+            "How many exam sessions are held each day (e.g. 2 for Morning and Afternoon sessions)."
+        )
         self.slots_per_day_input = QSpinBox()
         self.slots_per_day_input.setRange(1, 8)
         self.slots_per_day_input.setValue(2)
+        self.slots_per_day_input.setToolTip(slots_tip)
 
+        seed_tip = "Numerical seed for randomness (e.g. 0, 42). Using the exact same seed reproduces identical schedules."
         self.random_seed_input = QSpinBox()
         self.random_seed_input.setRange(-2147483648, 2147483647)
         self.random_seed_input.setValue(0)
+        self.random_seed_input.setToolTip(seed_tip)
+
+        workers_tip = "Number of CPU worker threads running concurrently. Set to 4 or 8 to speed up multi-try optimization."
+        self.n_input = QSpinBox()
+        self.n_input.setRange(1, 128)
+        self.n_input.setValue(4)
+        self.n_input.setToolTip(workers_tip)
 
         self.graph_coloring_params = QWidget(self)
         graph_coloring_layout = QFormLayout(self.graph_coloring_params)
         graph_coloring_layout.setContentsMargins(0, 0, 0, 0)
 
+        num_tries_tip = (
+            "Number of independent timetable coloring attempts to run.\n"
+            "Higher values try more stochastic search paths to find the lowest penalty schedule."
+        )
         self.num_tries_input = QSpinBox()
         self.num_tries_input.setRange(1, 100000)
         self.num_tries_input.setValue(32)
+        self.num_tries_input.setToolTip(num_tries_tip)
 
-        self.n_input = QSpinBox()
-        self.n_input.setRange(1, 128)
-        self.n_input.setValue(4)
-
-        graph_coloring_layout.addRow("Num tries", self.num_tries_input)
-        graph_coloring_layout.addRow("Parallel workers", self.n_input)
+        graph_coloring_layout.addRow(
+            _make_field_label("Num tries", num_tries_tip, self), self.num_tries_input
+        )
 
         self.annealing_params = QWidget(self)
         annealing_layout = QFormLayout(self.annealing_params)
         annealing_layout.setContentsMargins(0, 0, 0, 0)
 
+        iterations_tip = "Number of move evaluation iterations (e.g. 50,000). Higher values explore more schedule permutations."
         self.iterations_input = QSpinBox()
         self.iterations_input.setRange(1, 10000000)
         self.iterations_input.setValue(50000)
+        self.iterations_input.setToolTip(iterations_tip)
 
+        temp_tip = "Initial search temperature (e.g. 10.0). Higher values allow exploring suboptimal moves early on to escape local traps."
         self.initial_temperature_input = QDoubleSpinBox()
         self.initial_temperature_input.setRange(0.01, 10000.0)
         self.initial_temperature_input.setDecimals(2)
         self.initial_temperature_input.setValue(10.0)
+        self.initial_temperature_input.setToolTip(temp_tip)
 
+        cooling_tip = "Geometric cooling multiplier per iteration (e.g. 0.9998). Controls how gradually the search settles into the best schedule."
         self.cooling_rate_input = QDoubleSpinBox()
         self.cooling_rate_input.setRange(0.0001, 0.9999)
         self.cooling_rate_input.setDecimals(4)
         self.cooling_rate_input.setSingleStep(0.0001)
         self.cooling_rate_input.setValue(0.9998)
+        self.cooling_rate_input.setToolTip(cooling_tip)
 
-        annealing_layout.addRow("Iterations", self.iterations_input)
-        annealing_layout.addRow("Initial temperature", self.initial_temperature_input)
-        annealing_layout.addRow("Cooling rate", self.cooling_rate_input)
+        annealing_layout.addRow(
+            _make_field_label("Iterations", iterations_tip, self), self.iterations_input
+        )
+        annealing_layout.addRow(
+            _make_field_label("Initial temperature", temp_tip, self), self.initial_temperature_input
+        )
+        annealing_layout.addRow(
+            _make_field_label("Cooling rate", cooling_tip, self), self.cooling_rate_input
+        )
 
+        day_limit_tip = (
+            "Optional hard constraint: Cap the exam period to a fixed maximum number of days (e.g. 14 days).\n"
+            "If unchecked, Unisched will use as many days as necessary to avoid conflicts."
+        )
         self.limit_days_checkbox = QCheckBox("Use max days limit")
+        self.limit_days_checkbox.setToolTip(day_limit_tip)
+
         self.max_days_input = QSpinBox()
         self.max_days_input.setRange(1, 365)
         self.max_days_input.setValue(14)
         self.max_days_input.setEnabled(False)
+        self.max_days_input.setToolTip("Maximum allowed number of exam days.")
         self.limit_days_checkbox.toggled.connect(self.max_days_input.setEnabled)
 
         limit_days_wrapper = QWidget()
@@ -180,11 +307,23 @@ class ConfigFormWidget(QWidget):
         limit_days_layout.setContentsMargins(0, 0, 0, 0)
         limit_days_layout.addWidget(self.limit_days_checkbox)
         limit_days_layout.addWidget(self.max_days_input)
+        limit_days_wrapper.setToolTip(day_limit_tip)
 
-        optimizer_layout.addRow("Optimizer", self.optimizer_combo)
-        optimizer_layout.addRow("Slots per day", self.slots_per_day_input)
-        optimizer_layout.addRow("Day limit", limit_days_wrapper)
-        optimizer_layout.addRow("Random seed", self.random_seed_input)
+        optimizer_layout.addRow(
+            _make_field_label("Optimizer", optimizer_tip, self), self.optimizer_combo
+        )
+        optimizer_layout.addRow(
+            _make_field_label("Slots per day", slots_tip, self), self.slots_per_day_input
+        )
+        optimizer_layout.addRow(
+            _make_field_label("Day limit", day_limit_tip, self), limit_days_wrapper
+        )
+        optimizer_layout.addRow(
+            _make_field_label("Parallel workers", workers_tip, self), self.n_input
+        )
+        optimizer_layout.addRow(
+            _make_field_label("Random seed", seed_tip, self), self.random_seed_input
+        )
         optimizer_layout.addRow(self.graph_coloring_params)
         optimizer_layout.addRow(self.annealing_params)
 

@@ -14,5 +14,5 @@ def run_gui_app() -> int:
 
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.show()
+    window.showMaximized()
     return app.exec()

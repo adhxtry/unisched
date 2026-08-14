@@ -24,11 +24,20 @@ class ResultsViewWidget(QGroupBox):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__("Schedule Results", parent)
+        self.setToolTip(
+            "View and export the generated exam timetable, metrics, and room assignments."
+        )
 
         main_layout = QVBoxLayout(self)
 
         summary_row = QHBoxLayout()
         self.summary_label = QLabel("No schedule generated yet")
+        self.summary_label.setToolTip(
+            "Schedule Metrics:\n"
+            "• Scheduled: Total number of exams successfully placed in the timetable.\n"
+            "• Unscheduled: Exams that could not fit into the available time slots / rooms.\n"
+            "• Penalty: Soft penalty score based on same-day student exams (0 is a perfect schedule with zero same-day conflicts)."
+        )
         summary_row.addWidget(self.summary_label)
 
         main_layout.addLayout(summary_row)
@@ -36,11 +45,21 @@ class ResultsViewWidget(QGroupBox):
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Course", "Day", "Slot", "Halls"])
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setToolTip(
+            "Exam Timetable Assignments:\n"
+            "• Course: The course code or subject title.\n"
+            "• Day: The scheduled exam day number (1, 2, ...).\n"
+            "• Slot: The session on that day (e.g. 1 for Morning, 2 for Afternoon).\n"
+            "• Halls: The assigned exam halls with adequate capacity."
+        )
         main_layout.addWidget(self.table)
 
         action_row = QHBoxLayout()
         action_row.addStretch(1)
         self.export_button = QPushButton("Export CSV", self)
+        self.export_button.setToolTip(
+            "Click to export the displayed timetable to a CSV spreadsheet file on your computer."
+        )
         self.export_button.setEnabled(False)
         self.export_button.clicked.connect(self.export_requested.emit)
         action_row.addWidget(self.export_button)
