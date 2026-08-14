@@ -150,3 +150,32 @@ def test_optimize_graph_coloring_kempe_repair() -> None:
     assert mapping["B"] != mapping["C"]
     assert mapping["C"] != mapping["D"]
 
+
+def test_optimize_graph_coloring_with_halls_and_descent() -> None:
+    # 4 courses sharing students across 2 days, with hall capacities
+    courses = [
+        Course(code="A", students=frozenset({"s1", "s2"})),
+        Course(code="B", students=frozenset({"s2", "s3"})),
+        Course(code="C", students=frozenset({"s4"})),
+        Course(code="D", students=frozenset({"s1", "s5"})),
+    ]
+    time_slots = [
+        TimeSlot(day=1, slot_index=1),
+        TimeSlot(day=1, slot_index=2),
+        TimeSlot(day=2, slot_index=1),
+        TimeSlot(day=2, slot_index=2),
+    ]
+    halls = [
+        ExamHall(hall="H1", capacity=10, group=1),
+        ExamHall(hall="H2", capacity=10, group=1),
+    ]
+
+    schedule = optimize_graph_coloring(
+        courses, time_slots, halls=halls, num_tries=16, random_seed=42
+    )
+
+    assert schedule.is_complete is True
+    assert all(event.halls for event in schedule.events)
+    mapping = schedule.assignment_map()
+    assert mapping["A"] != mapping["B"]
+    assert mapping["A"] != mapping["D"]
